@@ -218,3 +218,5 @@ Released as **v0.6.0** (`promptshield-0.6.0.zip`). Status of each pre-submission
 - Redesigned `popup.html`/`popup.js` to a hand-tuned Google-style layout: gradient shield brand, filled-style text field, icon-led verdict cards, pill-style status chip, and a Light / System / Dark theme control in the footer (defaults to the system theme; preference is remembered in the extension page's own `localStorage` — still **no** `storage` permission requested).
 - Decision dialog and status pill in `content.js` now follow the system light/dark theme via a `getPal()` palette + CSS variables; theme changes apply live while a dialog is open.
 - The dark palette is Google's (`#292a2d` surface, `#8ab4f8` primary, `#f28b82`/`#81c995` semantic accents). Still no icons/asset, data, or permission changes; screenshot list unchanged (dark mode can be an extra shot).
+
+**v1.0.0 — submission cut.** Version renumbered `1.0.0` for the store release (`promptshield-1.0.0.zip`), matching manifest, popup footer, and STORE-LISTING. No functional change from 0.6.1.
