@@ -233,6 +233,10 @@ Every decision — request **and** response — lands in the audit log with a
 
 ---
 
+## Author
+
+Built and maintained by **Lohith Mudadla**.
+
 ## License
 
-MIT
+MIT — Copyright (c) 2026 Lohith Mudadla
