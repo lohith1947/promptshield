@@ -213,3 +213,8 @@ Released as **v0.6.0** (`promptshield-0.6.0.zip`). Status of each pre-submission
 - **Icons not referenced** — FIXED. `icons/icon16/32/48/128.png` added to the extension and an `icons` block added to the manifest.
 - **Redundant `http://localhost:8080/*` host permission** — already absent; `127.0.0.1:8080` retained as the (optional) gateway host and justified by the gateway feature.
 - **Remaining user-side actions (unchanged):** capture screenshots per `STORE-LISTING.md:28-42`, register the $5 developer account, upload the zip, and confirm the privacy-policy URL `https://lohith1947.github.io/promptshield/PRIVACY.md` is live.
+
+**v0.6.1 (UI/theme polish, no functional or permission change):**
+- Redesigned `popup.html`/`popup.js` to a hand-tuned Google-style layout: gradient shield brand, filled-style text field, icon-led verdict cards, pill-style status chip, and a Light / System / Dark theme control in the footer (defaults to the system theme; preference is remembered in the extension page's own `localStorage` — still **no** `storage` permission requested).
+- Decision dialog and status pill in `content.js` now follow the system light/dark theme via a `getPal()` palette + CSS variables; theme changes apply live while a dialog is open.
+- The dark palette is Google's (`#292a2d` surface, `#8ab4f8` primary, `#f28b82`/`#81c995` semantic accents). Still no icons/asset, data, or permission changes; screenshot list unchanged (dark mode can be an extra shot).

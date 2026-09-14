@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "promptshield - AI prompt privacy guard",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Blocks sensitive data from being sent to AI chat sites. Every prompt is scanned locally in your browser before it leaves. Offers block, mask & send, or send-anyway on detection.",
   "icons": {
     "16": "icons/icon16.png",

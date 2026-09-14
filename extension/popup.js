@@ -1,14 +1,50 @@
-// promptshield popup — shows gateway status and lets you test text manually.
+// promptshield popup — gateway + scan status, manual scanner, light/dark theme.
 
 const GATEWAY = 'http://127.0.0.1:8080';
 const dot = document.getElementById('dot');
 const statusText = document.getElementById('statusText');
 const verdict = document.getElementById('verdict');
 
+// ---- theme (auto by default, remembered in this page's localStorage) ----
+const mq = window.matchMedia('(prefers-color-scheme: dark)');
+const btnLight = document.getElementById('themeLight');
+const btnAuto = document.getElementById('themeAuto');
+const btnDark = document.getElementById('themeDark');
+
+function resolveTheme(chosen) {
+  if (chosen !== 'light' && chosen !== 'dark') return mq.matches ? 'dark' : 'light';
+  return chosen;
+}
+
+function applyTheme(chosen) {
+  document.documentElement.setAttribute('data-theme', resolveTheme(chosen));
+  btnLight.classList.toggle('on', chosen === 'light');
+  btnAuto.classList.toggle('on', chosen === 'auto');
+  btnDark.classList.toggle('on', chosen === 'dark');
+}
+
+let chosenTheme = 'auto';
+try {
+  const saved = localStorage.getItem('ps-theme');
+  if (saved === 'light' || saved === 'dark') chosenTheme = saved;
+} catch (_e) {}
+applyTheme(chosenTheme);
+
+function selectTheme(t) {
+  chosenTheme = t;
+  applyTheme(t);
+  try { localStorage.setItem('ps-theme', t); } catch (_e) {}
+}
+btnLight.addEventListener('click', () => selectTheme('light'));
+btnAuto.addEventListener('click', () => selectTheme('auto'));
+btnDark.addEventListener('click', () => selectTheme('dark'));
+mq.addEventListener('change', () => applyTheme(chosenTheme));
+
+// ---- status ----
 function setStatus(ok) {
   dot.classList.remove('ok', 'bad');
   dot.classList.add(ok ? 'ok' : 'bad');
-  statusText.textContent = ok ? 'gateway online' : 'local scanner active';
+  statusText.textContent = ok ? 'gateway online' : 'local scanner';
 }
 
 fetch(GATEWAY + '/healthz')
@@ -20,49 +56,66 @@ document.getElementById('privacyLink').addEventListener('click', (e) => {
   chrome.tabs.create({ url: 'https://github.com/lohith1947/promptshield/blob/main/PRIVACY.md' });
 });
 
+// ---- verdict cards ----
+const ICONS = {
+  pass: '<path d="M5 12.5l4.6 4.6L19 7.4" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  block: '<path d="M12 8v5M12 16.4v.2" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/><circle cx="12" cy="12" r="8.4" stroke="currentColor" stroke-width="1.9" fill="none"/>',
+  redact: '<path d="M12 4l7 2.8V11c0 4.1-2.9 7.3-7 9-4.1-1.7-7-4.9-7-9V6.8L12 4z" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linejoin="round"/>',
+  log: '<path d="M4 6.5h16M4 12h16M4 17.5h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+};
+
 function showVerdict(data) {
   verdict.className = '';
   verdict.innerHTML = '';
 
+  const state = data.verdict === 'redact' ? 'redact' : data.verdict;
+  verdict.classList.add('show', 'state-' + state);
+
+  const icon = document.createElement('div');
+  icon.className = 'vicon';
+  icon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24">' + (ICONS[state] || ICONS.log) + '</svg>';
+
   const title = document.createElement('div');
-  title.className = 'title';
+  title.className = 'vtitle';
+  const sub = document.createElement('div');
+  sub.className = 'vsub';
+  const names = (data.blocked_names && data.blocked_names.length)
+    ? data.blocked_names
+    : (data.detections || []).map((d) => d.name);
+  const crit = (data.detections || []).filter((d) => d.severity === 'critical').length;
 
-  if (data.verdict === 'pass') {
-    title.textContent = 'Safe - nothing sensitive detected';
-    verdict.className = 'pass';
+  if (state === 'pass') {
+    title.textContent = 'No sensitive data detected';
+    sub.textContent = 'Looks safe — a prompt like this would go through.';
+  } else if (state === 'block') {
+    title.textContent = 'Critical data found — blocked';
+    sub.textContent = crit + ' critical finding' + (crit === 1 ? '' : 's') +
+      '. Nothing was sent; ' + (names.length || 'the flagged data') + ' stays in your box.';
+  } else if (state === 'redact') {
+    title.textContent = 'Would be masked before sending';
+    sub.textContent = 'These become ' + (names.length || 'sensitive') + ' placeholders first.';
   } else {
-    const crit = (data.detections || []).filter((d) => d.severity === 'critical').length;
-    const names = (data.blocked_names && data.blocked_names.length)
-      ? data.blocked_names
-      : (data.detections || []).map((d) => d.name);
-
-    if (data.verdict === 'block') {
-      title.textContent = crit + ' critical finding' + (crit === 1 ? '' : 's') + ' - blocked';
-      verdict.className = 'block';
-    } else if (data.verdict === 'redact') {
-      title.textContent = 'Sensitive data - would be masked';
-      verdict.className = 'redact';
-    } else {
-      title.textContent = (names.length || 'sensitive') + ' finding(s) - logged';
-      verdict.className = 'log';
-    }
-
-    if (names && names.length) {
-      const wrap = document.createElement('div');
-      wrap.className = 'names';
-      names.forEach((n) => {
-        const chip = document.createElement('span');
-        chip.textContent = n;
-        wrap.appendChild(chip);
-      });
-      verdict.appendChild(wrap);
-    }
+    title.textContent = 'Sensitive data found — logged';
+    sub.textContent = 'Logged to your local audit trail.';
   }
 
+  verdict.appendChild(icon);
   verdict.appendChild(title);
+  verdict.appendChild(sub);
+
+  if (names && names.length) {
+    const wrap = document.createElement('div');
+    wrap.className = 'vnames';
+    names.forEach((n) => {
+      const chip = document.createElement('span');
+      chip.textContent = n;
+      wrap.appendChild(chip);
+    });
+    verdict.appendChild(wrap);
+  }
 }
 
-// Show the masked version of the text — what "Mask & send" would send.
+// ---- masked version ----
 const maskedBox = document.getElementById('masked');
 const maskedText = document.getElementById('maskedText');
 const copyMasked = document.getElementById('copyMasked');
@@ -87,6 +140,7 @@ copyMasked.addEventListener('click', async () => {
   }
 });
 
+// ---- scan ----
 document.getElementById('scan').addEventListener('click', async () => {
   const text = document.getElementById('text').value.trim();
   if (!text) {
@@ -94,7 +148,7 @@ document.getElementById('scan').addEventListener('click', async () => {
     return;
   }
   verdict.className = '';
-  verdict.innerHTML = '<div class="title" style="color:var(--muted)">scanning...</div>';
+  verdict.classList.remove('show');
   maskedBox.classList.remove('show');
 
   let data;
