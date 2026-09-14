@@ -1,0 +1,21 @@
+# Binaries
+promptshield
+promptshield.exe
+*.exe
+
+# Go
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs (audit trail contains local usage activity — never commit)
+*.log
+*.jsonl

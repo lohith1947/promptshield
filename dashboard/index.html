@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>promptshield - Control Room</title>
+<style>
+  :root {
+    --bg: #0e141c;
+    --panel: #161d28;
+    --panel2: #1c2532;
+    --border: #273244;
+    --text: #eef3f9;
+    --muted: #8aa0b8;
+    --blue: #4f9cf9;
+    --green: #7cb342;
+    --red: #e74c3c;
+    --orange: #f5a623;
+    --purple: #a78bfa;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* header */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(14, 20, 28, .92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand h1 { font-size: 20px; font-weight: 800; letter-spacing: .2px; }
+  .brand h1 span { color: var(--blue); }
+  .brand .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  #status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    font: 600 12px/1 system-ui;
+    letter-spacing: .2px;
+  }
+  #status.online { color: var(--green); border-color: rgba(124,179,66,.5); }
+  #status.offline { color: var(--red); border-color: rgba(231,76,60,.5); }
+  #status .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+  /* stats */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    padding: 28px;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--accent, var(--blue));
+  }
+  .stat .num { font-size: 30px; font-weight: 800; letter-spacing: -.5px; color: var(--accent, var(--text)); }
+  .stat .label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    font-weight: 600;
+  }
+  .stat .hint { font-size: 11px; color: var(--muted); margin-top: 6px; opacity: .85; }
+  .accent-blue { --accent: var(--blue); }
+  .accent-red { --accent: var(--red); }
+  .accent-orange { --accent: var(--orange); }
+  .accent-purple { --accent: var(--purple); }
+  .accent-green { --accent: var(--green); }
+
+  /* feed */
+  .feed {
+    margin: 0 28px 28px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .feed-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    font-weight: 600;
+  }
+  .feed-header .count { color: var(--muted); opacity: .8; }
+  .entry {
+    padding: 13px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    animation: fade-in .3s ease;
+  }
+  .entry:last-child { border-bottom: none; }
+  @keyframes fade-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .tag {
+    flex: none;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+  }
+  .tag.block { background: rgba(231,76,60,.15); color: #ff8a80; }
+  .tag.redact { background: rgba(245,166,35,.15); color: #ffc46b; }
+  .tag.log { background: rgba(79,156,249,.15); color: #7cb3ff; }
+  .tag.allow { background: rgba(100,232,202,.12); color: #64e8ca; }
+  .tag.pass { background: rgba(124,179,66,.15); color: #a5d6a7; }
+  .tag.dir { background: transparent; border: 1px dashed #3a4a63; color: var(--muted); }
+  .tag.dir.request { color: #7cb3ff; border-color: #2a5f9e; background: rgba(79,156,249,.06); }
+  .tag.dir.response { color: #b59aff; border-color: #5b3f9e; background: rgba(167,139,250,.08); }
+  .tag.dir.scan { color: #64c8b8; border-color: #2a7a6a; background: rgba(100,200,184,.08); }
+  .path {
+    font-family: 'Cascadia Code', Consolas, monospace;
+    font-size: 12px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 26%;
+    min-width: 0;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip {
+    font: 600 10.5px/1.3 'Cascadia Code', Consolas, monospace;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .chip.block { color: #ff8a80; background: rgba(231,76,60,.14); border: 1px solid rgba(231,76,60,.35); }
+  .chip.info { color: #b9c7da; background: rgba(138,160,184,.12); border: 1px solid rgba(138,160,184,.3); }
+  .meta { margin-left: auto; flex: none; color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .empty {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .empty .big { font-size: 30px; margin-bottom: 8px; opacity: .5; }
+
+  .footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11.5px;
+    padding: 12px 16px 24px;
+    opacity: .85;
+  }
+
+  /* legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin-top: 10px; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+  .legend .swatch { width: 9px; height: 9px; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="rgba(79,156,249,.15)">
+      <path d="M12 2l8 3.2V11c0 4.7-3.3 8.3-8 11-4.7-2.7-8-6.3-8-11V5.2L12 2z" stroke="#4f9cf9" stroke-width="1.6"/>
+      <path d="M9 11.6l2.1 2.1 4.1-4.3" stroke="#4f9cf9" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div>
+      <h1>prompt<span>shield</span></h1>
+      <div class="sub">Control Room</div>
+    </div>
+  </div>
+  <span id="status"><span class="dot"></span><span id="statusText">checking...</span></span>
+</header>
+
+<div class="stats" id="stats">
+  <div class="stat accent-blue"><div class="num" id="total">0</div><div class="label">Requests</div><div class="hint">all scanned decisions</div></div>
+  <div class="stat accent-green"><div class="num" id="ok">0</div><div class="label">Safe</div><div class="hint">passed through</div></div>
+  <div class="stat accent-orange"><div class="num" id="redacted">0</div><div class="label">Redacted</div><div class="hint">secret scrubbed</div></div>
+  <div class="stat accent-purple"><div class="num" id="logged">0</div><div class="label">Logged</div><div class="hint">observe mode</div></div>
+  <div class="stat accent-red"><div class="num" id="blocked">0</div><div class="label">Blocked</div><div class="hint">critical stopped</div></div>
+</div>
+
+<div class="feed">
+  <div class="feed-header">
+    <span>Live Activity</span>
+    <span class="count" id="count"></span>
+  </div>
+  <div id="feed">
+    <div class="empty">
+      <div class="big">&#128737;</div>
+      No traffic yet. Point your AI tool at <b style="color:var(--text)">http://localhost:8080/v1</b><br>
+      or send a prompt from the browser extension to see it here.
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <span><span class="swatch" style="background:var(--green)"></span>Safe</span>
+  <span><span class="swatch" style="background:var(--orange)"></span>Redacted</span>
+  <span><span class="swatch" style="background:var(--blue)"></span>Logged</span>
+  <span><span class="swatch" style="background:#64e8ca"></span>Allowed (sent anyway)</span>
+  <span><span class="swatch" style="background:var(--red)"></span>Blocked</span>
+  <span><span class="swatch" style="background:var(--purple)"></span>API scan</span>
+</div>
+
+<div class="footer">Every decision in both directions is recorded here. Raw secret values are never stored — only the detection types.</div>
+
+<script>
+const GATEWAY = 'http://127.0.0.1:8080';
+
+async function refreshStatus() {
+  const el = document.getElementById('status');
+  const text = document.getElementById('statusText');
+  try {
+    const res = await fetch(GATEWAY + '/healthz', { cache: 'no-store' });
+    el.className = res.ok ? 'online' : 'offline';
+    text.textContent = res.ok ? 'gateway online' : 'gateway offline';
+  } catch (e) {
+    el.className = 'offline';
+    text.textContent = 'gateway offline';
+  }
+}
+
+async function refresh() {
+  try {
+    const statsRes = await fetch('/api/stats');
+    const stats = await statsRes.json();
+    document.getElementById('total').textContent = stats.total || 0;
+    document.getElementById('ok').textContent = stats.pass || 0;
+    document.getElementById('redacted').textContent = stats.redact || 0;
+    document.getElementById('logged').textContent = stats.log || 0;
+    document.getElementById('blocked').textContent = stats.block || 0;
+  } catch (e) {
+    // dashboard API not reachable - keep last values
+  }
+
+  try {
+    const logRes = await fetch('/api/log');
+    const entries = await logRes.json();
+    const feed = document.getElementById('feed');
+    document.getElementById('count').textContent = entries.length ? 'last ' + entries.length : '';
+
+    if (entries.length === 0) {
+      feed.innerHTML = '<div class="empty"><div class="big">&#128737;</div>No traffic yet. Point your AI tool at <b style="color:var(--text)">http://localhost:8080/v1</b><br>or send a prompt from the browser extension to see it here.</div>';
+      return;
+    }
+
+    feed.innerHTML = entries.map(e => {
+      const blocked = e.blocked_names || [];
+      const others = (e.detections || []).filter(n => blocked.indexOf(n) === -1);
+      const chips =
+        (blocked.length ? blocked.map(n => chip(n, 'block')).join('') : '') +
+        (others.length ? others.slice(0, 4).map(n => chip(n, 'info')).join('') : '') +
+        (others.length > 4 ? '<span class="chip info">+' + (others.length - 4) + '</span>' : '');
+      const dirLabel = e.direction === 'response' ? 'OUT' : e.direction === 'scan' ? 'EXT' : 'IN';
+      const dirClass = e.direction === 'response' ? 'response' : e.direction === 'scan' ? 'scan' : 'request';
+      const time = (e.timestamp || '').replace('T', ' ');
+      return `
+        <div class="entry">
+          <span class="tag ${e.action}">${e.action}</span>
+          <span class="tag dir ${dirClass}">${dirLabel}</span>
+          <span class="path" title="${escapeHtml(e.path || '')}">${escapeHtml(e.path || '')}</span>
+          ${chips ? `<span class="chips">${chips}</span>` : ''}
+          <span class="meta">${escapeHtml(time).slice(5, 19)}</span>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    // ignore transient errors
+  }
+}
+
+function chip(text, cls) {
+  return '<span class="chip ' + cls + '">' + escapeHtml(text) + '</span>';
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+setInterval(refresh, 2000);
+setInterval(refreshStatus, 5000);
+refreshStatus();
+refresh();
+</script>
+</body>
+</html>
