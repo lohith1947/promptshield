@@ -8,7 +8,7 @@ const verdict = document.getElementById('verdict');
 function setStatus(ok) {
   dot.classList.remove('ok', 'bad');
   dot.classList.add(ok ? 'ok' : 'bad');
-  statusText.textContent = ok ? 'gateway online' : 'gateway offline';
+  statusText.textContent = ok ? 'gateway online' : 'local scanner active';
 }
 
 fetch(GATEWAY + '/healthz')
@@ -96,6 +96,10 @@ document.getElementById('scan').addEventListener('click', async () => {
   verdict.className = '';
   verdict.innerHTML = '<div class="title" style="color:var(--muted)">scanning...</div>';
   maskedBox.classList.remove('show');
+
+  let data;
+  // Prefer the local gateway for consistency with the dashboard/audit log;
+  // fall back to the in-page scanner when it is unreachable or missing.
   try {
     const res = await fetch(GATEWAY + '/api/scan', {
       method: 'POST',
@@ -103,12 +107,11 @@ document.getElementById('scan').addEventListener('click', async () => {
       body: JSON.stringify({ text }),
     });
     if (!res.ok) throw new Error('bad status ' + res.status);
-    const data = await res.json();
-    showVerdict(data);
-    showMasked(data.safe_text);
+    data = await res.json();
   } catch (_e) {
+    data = PromptShieldScanner.scanText(text);
     setStatus(false);
-    verdict.className = 'block';
-    verdict.innerHTML = '<div class="title">Cannot reach gateway</div>';
   }
+  showVerdict(data);
+  showMasked(data.safe_text);
 });

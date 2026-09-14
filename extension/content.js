@@ -1,8 +1,10 @@
 // promptshield content script
-// Intercepts prompts typed into AI chat sites and scans them against the
-// local promptshield gateway BEFORE they are sent. If the gateway says the
-// text contains sensitive data, the send is paused and a dialog lets you
-// either block it or send it anyway. Nothing is transmitted until you choose.
+// Intercepts prompts typed into AI chat sites and scans them BEFORE they are
+// sent. Scanning runs locally in the browser (PromptShieldScanner, see
+// scanner.js); if the optional local gateway is also online, its verdict is
+// preferred so it can log to the dashboard/audit log. If sensitive data is
+// found, the send is paused and a dialog lets you either block it, mask it,
+// or send it anyway. Nothing is transmitted until you choose.
 
 const GATEWAY = 'http://127.0.0.1:8080';
 
@@ -54,20 +56,27 @@ function setText(el, text) {
   document.execCommand('insertText', false, text);
 }
 
-// Fail-open: if the local gateway is unreachable we let the message through,
-// so the chat site always keeps working. The popup shows gateway status.
+// Default: scan locally (runs in every browser with zero setup).
+// If the optional gateway is online we also call it so it can log to the
+// audit/dashboard — but the local scanner always runs regardless.
+// On gateway offline or error the prompt is still blocked if the local scan
+// finds sensitive data, so the user is protected either way.
+let gatewayOnline = false;
+
 async function scan(text) {
+  const local = PromptShieldScanner.scanText(text);
   try {
     const res = await fetch(GATEWAY + '/api/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
     });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (_e) {
-    return null;
-  }
+    if (res.ok) {
+      const gw = await res.json();
+      if (gw) return gw;
+    }
+  } catch (_e) { /* fall through to local */ }
+  return local;
 }
 
 // 'redact' also blocks the send in the browser: we cannot redact inside these
@@ -312,12 +321,8 @@ function intercept(el, e) {
   e.stopImmediatePropagation();
 
   scan(text).then((result) => {
-    if (!result) {
-      reTriggerSend(el, e); // gateway offline -> allow
-      return;
-    }
     if (shouldBlock(result.verdict)) {
-      if (decisionOpen) return; // dialog already asking the user
+      if (decisionOpen) return;
       const names = result.blocked_names || (result.detections || []).map((d) => d.name);
       showDecisionDialog(names, el, e, result.safe_text);
       return; // keep the text, nothing was sent yet
@@ -365,15 +370,19 @@ function attach() {
 
   const update = () => {
     fetch(GATEWAY + '/healthz', { method: 'GET' }).then((res) => {
-      pill.style.color = res.ok ? '#137333' : '#c5221f';
-      pill.style.borderColor = res.ok ? '#ceead6' : '#f2a19c';
-      pill.style.background = res.ok ? '#e6f4ea' : '#fce8e6';
-      pill.textContent = res.ok ? 'promptshield: protected' : 'promptshield: gateway offline (fail-open)';
+      gatewayOnline = res.ok;
+      pill.style.color = '#137333';
+      pill.style.borderColor = '#ceead6';
+      pill.style.background = '#e6f4ea';
+      pill.textContent = res.ok
+        ? 'promptshield: protected'
+        : 'promptshield: local scanning active';
     }).catch(() => {
-      pill.style.color = '#c5221f';
-      pill.style.borderColor = '#f2a19c';
-      pill.style.background = '#fce8e6';
-      pill.textContent = 'promptshield: gateway offline (fail-open)';
+      gatewayOnline = false;
+      pill.style.color = '#137333';
+      pill.style.borderColor = '#ceead6';
+      pill.style.background = '#e6f4ea';
+      pill.textContent = 'promptshield: local scanning active';
     });
   };
   update();

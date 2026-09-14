@@ -31,7 +31,7 @@ Most AI tools send the **full editor context** on every request. That context ro
 | **3 policy modes** | `block` (default), `redact`, `observe` — applied to both directions |
 | **Send-anyway confirmation** | Native popup (Windows): before a request is blocked, choose **Yes = send it anyway** or **No = block**. Times out → block. |
 | **`/api/scan` endpoint** | Scan arbitrary text (used by the extension); one engine, one audit log |
-| **Browser extension** | Manifest V3 (Chrome/Edge) — intercepts prompts in chatgpt.com, claude.ai, gemini before they are sent |
+| **Browser extension** | Manifest V3 (Chrome/Edge) — scans prompts locally in the browser before they are sent to chatgpt.com, claude.ai, gemini.google.com and 12 more sites; optional gateway adds a dashboard/audit log |
 | **Audit log** | Every decision recorded to JSONL — block/redact/pass, request vs response, never the raw secret |
 | **Embedded dashboard** | HTML control room at `localhost:3000`, served from the binary itself, showing live activity |
 | **Health endpoint** | `/healthz` for monitoring |
@@ -107,22 +107,25 @@ Open: [http://localhost:3000](http://localhost:3000)
 
 The gateway only protects tools you can *point* at `http://localhost:8080/v1`.
 Web UIs (chatgpt.com, claude.ai, gemini.google.com) have no such setting — that
-is what the extension is for. It intercepts your prompt **before it is sent**,
-asks the local gateway to scan it, and cancels the send if sensitive data is
-found. Both paths share the same scanner, audit log, and dashboard.
+is what the extension is for. It intercepts your prompt **before it is sent** and
+scans it **locally in the browser** (built-in engine in `extension/scanner.js`).
+If the optional gateway is also running, its verdict is preferred so the event
+can be logged to the audit log and dashboard. Either way, the send is cancelled
+if sensitive data is found.
 
 ### Install (Chrome / Edge)
 
-1. Make sure the gateway is running: `go run main.go`
-2. Open `chrome://extensions` (Edge: `edge://extensions`)
-3. Enable **Developer mode**
-4. Click **Load unpacked** and select the `extension/` folder
-5. Pin the promptshield icon — the popup shows gateway status and lets you test
+1. Load the unpacked extension: `chrome://extensions` → **Developer mode** →
+   **Load unpacked** → select the `extension/` folder. The gateway is **not
+   required** — scanning works standalone in the browser.
+2. (Optional) For the dashboard/audit log, also run the gateway: `go run main.go`
+3. Pin the promptshield icon — the popup shows gateway status and lets you test
    any prompt manually
 
 ### Test it
 
-Open chatgpt.com/claude.ai, type something like:
+Open any supported chat site (chatgpt.com, claude.ai, gemini.google.com, …),
+type something like:
 
 ```
 My AWS key is AKIAIOSFODNN7EXAMPLE, can you review it?
@@ -132,20 +135,22 @@ Press send — promptshield pauses the send and shows a **decision dialog**
 with three choices: **"Block (don't send)"**, **"Mask & send"** — the flagged
 values are replaced with `[REDACTED_*]` placeholders right in your prompt and
 then sent — or **"Send it anyway"**. If you block, **nothing is transmitted**
-and your text stays in the box. Either way, a `scan` event appears in the
-dashboard. Safe prompts pass through with no dialog.
+and your text stays in the box. If the gateway is running, a `scan` event
+appears in the dashboard. Safe prompts pass through with no dialog.
 
-> **Fail-open by design:** if the gateway is off, the chat site keeps working
-> and the banner/pill turns red ("gateway offline"). If your policy is strict,
-> flip this in `extension/content.js` (`shouldBlock` on an unreachable gateway).
+> **Always protected:** scanning runs locally in the browser even when the
+> gateway is off — the status pill just switches from "protected" to
+> "local scanning active" (both green). The gateway only adds the local
+> dashboard/audit log.
 
 ### How it works
 
 ```
-chat UIs ──▶ content.js intercepts send ──▶ POST /api/scan (127.0.0.1:8080)
+chat UIs ──▶ content.js intercepts send ──▶ scanner.js (local, in browser)
+                                                 │  └─▶ POST /api/scan to 127.0.0.1:8080 (optional)
                                                  │
-                       blocked/redact ──▶ cancel send + red banner
-                       pass/safe      ──▶ re-trigger the send normally
+                  blocked/redact ──▶ cancel send + decision dialog
+                  pass/safe      ──▶ re-trigger the send normally
 ```
 
 ---
@@ -192,8 +197,10 @@ promptshield/
 ├── dashboard/          # embedded HTML control room
 └── extension/          # Chrome/Edge Manifest V3 extension
     ├── manifest.json
+    ├── scanner.js      # local, in-browser detection engine (works standalone)
     ├── content.js      # send interception in chat pages
-    └── popup.*         # status + manual scan tester
+    ├── popup.*         # status + manual scan tester
+    └── icons/          # 16/32/48/128 png icons
 ```
 
 Flow — both directions are guarded:
