@@ -38,7 +38,7 @@ func GetPatterns() []Pattern {
 		{Name: "Stripe_Key", Regex: regexp.MustCompile(`\b(rk_live|sk_live|rk_test|sk_test)_[A-Za-z0-9]{20,}\b`), Severity: "critical", Blockable: true},
 		{Name: "Private_Key_PEM", Regex: regexp.MustCompile(`-----BEGIN (RSA |EC )?PRIVATE KEY-----`), Severity: "critical", Blockable: true},
 		{Name: "JWT_Token", Regex: regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b`), Severity: "critical", Blockable: true},
-		{Name: "Generic_Password", Regex: regexp.MustCompile(`(?i)\b(password|passwd|pwd|secret|token|api[_\-]?key)\b\s*(?:[:=]|\b(?:is|was|had)\b)?\s*["']?[^\s"']{8,}["']?`), Severity: "high", Blockable: true},
+		{Name: "Generic_Password", Regex: regexp.MustCompile(`(?i)\b(password|passwd|pwd|secret|token|api[_\-]?key)\b\s*(?:[:=]|\b(?:is|was|had)\b)?\s*["']?([^\s"']{8,})["']?`), Severity: "high", Blockable: true},
 
 		// === CONTACT (High) ===
 		{Name: "Email", Regex: regexp.MustCompile(`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`), Severity: "high", Blockable: false},

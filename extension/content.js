@@ -29,6 +29,31 @@ function readText(el) {
   return (el.innerText || el.textContent || '').trim();
 }
 
+// Write text into a composer (textarea or contenteditable div) in a way that
+// React/Vue/rich-text UIs actually pick up. For textareas this uses the native
+// value setter (bypasses React's value tracker) then fires input/change. For
+// contenteditable divs (ChatGPT, Claude) it selects all and uses execCommand,
+// which natively triggers the framework's input events.
+function setText(el, text) {
+  if (!el) return;
+  if (el.tagName === 'TEXTAREA') {
+    const proto = window.HTMLTextAreaElement && window.HTMLTextAreaElement.prototype;
+    const setter = proto && Object.getOwnPropertyDescriptor(proto, 'value');
+    if (setter && setter.set) setter.set.call(el, text);
+    else el.value = text;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    return;
+  }
+  el.focus();
+  const sel = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  document.execCommand('insertText', false, text);
+}
+
 // Fail-open: if the local gateway is unreachable we let the message through,
 // so the chat site always keeps working. The popup shows gateway status.
 async function scan(text) {
@@ -86,8 +111,9 @@ function reTriggerSend(el, originalEvent) {
 }
 
 // If a blocked prompt is detected we do NOT silently refuse the send. Instead
-// a top-anchored decision card appears with two actions: "Block (don't send)"
-// or "Send it anyway". The prompt stays in the composer until the user chooses.
+// a top-anchored decision card appears with three actions: "Block (don't send)",
+// "Mask & send" (replace the flagged values with placeholders, then send) and
+// "Send it anyway". The prompt stays in the composer until the user chooses.
 let decisionOpen = false;
 
 function injectDialogStyles() {
@@ -104,7 +130,7 @@ function injectDialogStyles() {
   (document.head || document.documentElement).appendChild(style);
 }
 
-function showDecisionDialog(names, el, originalEvent) {
+function showDecisionDialog(names, el, originalEvent, safeText) {
   if (decisionOpen) return;
   decisionOpen = true;
   injectDialogStyles();
@@ -185,7 +211,8 @@ function showDecisionDialog(names, el, originalEvent) {
   const msg = document.createElement('div');
   msg.style.cssText = 'color:#94a7bd;font-size:12.5px;margin:10px 0 0;';
   msg.textContent = 'Your prompt was NOT sent and is still in the input box. ' +
-    'Sending it anyway will expose this data to the AI provider.';
+    '"Mask & send" replaces the flagged values with placeholders before sending; ' +
+    'sending it anyway will expose this data to the AI provider.';
 
   const actions = document.createElement('div');
   actions.style.cssText = 'display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07);';
@@ -198,6 +225,16 @@ function showDecisionDialog(names, el, originalEvent) {
     'font:600 13px/1 system-ui','padding:10px 16px','border-radius:8px',
     'cursor:pointer','color:#eef3f9','background:#333f52',
     'border:1px solid rgba(255,255,255,.12)',
+  ].join(';');
+
+  const maskBtn = document.createElement('button');
+  maskBtn.type = 'button';
+  maskBtn.textContent = 'Mask & send';
+  maskBtn.title = 'Replace the sensitive values with placeholders, then send';
+  maskBtn.style.cssText = [
+    'font:600 13px/1 system-ui','padding:10px 16px','border-radius:8px',
+    'cursor:pointer','color:#a5d6a7','background:rgba(124,179,66,.14)',
+    'border:1px solid rgba(124,179,66,.5)',
   ].join(';');
 
   const sendBtn = document.createElement('button');
@@ -226,6 +263,20 @@ function showDecisionDialog(names, el, originalEvent) {
   blockBtn.addEventListener('click', close);
   closeBtn.addEventListener('click', close);
 
+  maskBtn.addEventListener('click', () => {
+    decisionOpen = false;
+    window.removeEventListener('keydown', onEsc, true);
+    card.remove();
+    // Rewrite the composer with the masked text, then send. A short delay lets
+    // the input event propagate so the chat UI reads the new text.
+    if (safeText) {
+      setText(el, safeText);
+      setTimeout(() => reTriggerSend(el, originalEvent), 60);
+    } else {
+      reTriggerSend(el, originalEvent);
+    }
+  });
+
   sendBtn.addEventListener('click', () => {
     decisionOpen = false;
     window.removeEventListener('keydown', onEsc, true);
@@ -242,6 +293,7 @@ function showDecisionDialog(names, el, originalEvent) {
   body.appendChild(chips);
   body.appendChild(msg);
   actions.appendChild(blockBtn);
+  actions.appendChild(maskBtn);
   actions.appendChild(sendBtn);
   card.appendChild(header);
   card.appendChild(body);
@@ -266,7 +318,7 @@ function intercept(el, e) {
     if (shouldBlock(result.verdict)) {
       if (decisionOpen) return; // dialog already asking the user
       const names = result.blocked_names || (result.detections || []).map((d) => d.name);
-      showDecisionDialog(names, el, e);
+      showDecisionDialog(names, el, e, result.safe_text);
       return; // keep the text, nothing was sent yet
     }
     reTriggerSend(el, e);

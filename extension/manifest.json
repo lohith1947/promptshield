@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "promptshield",
-  "version": "0.3.0",
-  "description": "Blocks sensitive data from being sent to AI chat sites. Every prompt is scanned by your local promptshield gateway before it leaves the browser.",
+  "version": "0.4.0",
+  "description": "Blocks sensitive data from being sent to AI chat sites. Every prompt is scanned by your local promptshield gateway before it leaves the browser. Offers block, mask & send, or send-anyway on detection.",
   "permissions": ["storage"],
   "host_permissions": [
     "http://127.0.0.1:8080/*",

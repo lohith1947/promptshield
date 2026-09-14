@@ -84,6 +84,10 @@ type ScanResponse struct {
 	Verdict    string          `json:"verdict"` // block / redact / log / pass
 	Detections []ScanDetection `json:"detections"`
 	Blocked    []string        `json:"blocked_names"`
+	// SafeText is the input with every detected value replaced by a
+	// [REDACTED_*] placeholder. The raw secrets are never returned. Empty
+	// when nothing was detected.
+	SafeText string `json:"safe_text,omitempty"`
 }
 
 // New builds a Server
@@ -175,6 +179,11 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, d := range detections {
 		resp.Detections = append(resp.Detections, ScanDetection{Name: d.Name, Severity: d.Severity})
+	}
+	// Provide a mask-and-send variant regardless of verdict severity, so the
+	// browser extension can offer "mask the sensitive parts and still send".
+	if len(detections) > 0 {
+		resp.SafeText = scanner.MaskValues(req.Text, detections, "REDACTED")
 	}
 
 	s.al.Record(logger.Entry{

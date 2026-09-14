@@ -47,6 +47,30 @@ func (s *Scanner) Scan(text string) []Detection {
 	var detections []Detection
 
 	for _, p := range s.patterns {
+		// Generic_Password captures a label + value ("password is Panda@167").
+		// Only the value (regex group 2) counts as the match, so masking
+		// replaces just the secret and preserves the surrounding words instead
+		// of swallowing the whole "password is ..." phrase.
+		if p.Name == "Generic_Password" {
+			locs := p.Regex.FindAllStringSubmatchIndex(text, -1)
+			for _, loc := range locs {
+				if len(loc) < 6 {
+					continue
+				}
+				valStart, valEnd := loc[4], loc[5]
+				if valStart < 0 || valEnd < 0 {
+					continue
+				}
+				detections = append(detections, Detection{
+					Name:     p.Name,
+					Severity: p.Severity,
+					Match:    text[valStart:valEnd],
+					Position: valStart,
+				})
+			}
+			continue
+		}
+
 		matches := p.Regex.FindAllStringIndex(text, -1)
 		for _, loc := range matches {
 			match := text[loc[0]:loc[1]]

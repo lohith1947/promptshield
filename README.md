@@ -129,10 +129,11 @@ My AWS key is AKIAIOSFODNN7EXAMPLE, can you review it?
 ```
 
 Press send — promptshield pauses the send and shows a **decision dialog**
-("Block (don't send)" / "Send it anyway"). If you block, **nothing is
-transmitted** and your text stays in the box. If you choose "Send it anyway",
-the prompt goes through. Either way, a `scan` event appears in the dashboard.
-Safe prompts pass through with no dialog.
+with three choices: **"Block (don't send)"**, **"Mask & send"** — the flagged
+values are replaced with `[REDACTED_*]` placeholders right in your prompt and
+then sent — or **"Send it anyway"**. If you block, **nothing is transmitted**
+and your text stays in the box. Either way, a `scan` event appears in the
+dashboard. Safe prompts pass through with no dialog.
 
 > **Fail-open by design:** if the gateway is off, the chat site keeps working
 > and the banner/pill turns red ("gateway offline"). If your policy is strict,

@@ -56,11 +56,40 @@ function showVerdict(data) {
   verdict.appendChild(title);
 }
 
+// Show the masked version of the text — what "Mask & send" would send.
+const maskedBox = document.getElementById('masked');
+const maskedText = document.getElementById('maskedText');
+const copyMasked = document.getElementById('copyMasked');
+
+function showMasked(safeText) {
+  if (!safeText) {
+    maskedBox.classList.remove('show');
+    return;
+  }
+  maskedText.value = safeText;
+  maskedBox.classList.add('show');
+}
+
+copyMasked.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(maskedText.value);
+    copyMasked.textContent = 'Copied';
+    setTimeout(() => (copyMasked.textContent = 'Copy'), 1200);
+  } catch (_e) {
+    maskedText.select();
+    document.execCommand('copy');
+  }
+});
+
 document.getElementById('scan').addEventListener('click', async () => {
   const text = document.getElementById('text').value.trim();
-  if (!text) return;
+  if (!text) {
+    maskedBox.classList.remove('show');
+    return;
+  }
   verdict.className = '';
   verdict.innerHTML = '<div class="title" style="color:var(--muted)">scanning...</div>';
+  maskedBox.classList.remove('show');
   try {
     const res = await fetch(GATEWAY + '/api/scan', {
       method: 'POST',
@@ -68,7 +97,9 @@ document.getElementById('scan').addEventListener('click', async () => {
       body: JSON.stringify({ text }),
     });
     if (!res.ok) throw new Error('bad status ' + res.status);
-    showVerdict(await res.json());
+    const data = await res.json();
+    showVerdict(data);
+    showMasked(data.safe_text);
   } catch (_e) {
     setStatus(false);
     verdict.className = 'block';

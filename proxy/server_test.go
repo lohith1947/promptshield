@@ -318,6 +318,46 @@ func TestScanEndpoint_CORSHeaders(t *testing.T) {
 	}
 }
 
+func TestScanEndpoint_ReturnsMaskedText(t *testing.T) {
+	upstream := echoUpstream(t)
+	defer upstream.Close()
+	al, err := logger.New(t.TempDir() + "/audit.jsonl")
+	if err != nil {
+		t.Fatalf("logger: %v", err)
+	}
+	p := policy.Default()
+	p.Mode = policy.ModeBlock
+	server := New(Config{Upstream: upstream.srv.URL + "/v1"}, scanner.New(), p, al)
+
+	text := "My AWS key is AKIAIOSFODNN7EXAMPLE and email bob@example.org"
+	handle := server.Handler()
+	reqBody, _ := json.Marshal(ScanRequest{Text: text})
+	req := httptest.NewRequest("POST", "/api/scan", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handle.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var out ScanResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("bad scan response: %v", err)
+	}
+	if out.SafeText == "" {
+		t.Fatal("expected safe_text to be populated when detections exist")
+	}
+	if strings.Contains(out.SafeText, "AKIAIOSFODNN7EXAMPLE") {
+		t.Errorf("safe_text must not contain the AWS key: %q", out.SafeText)
+	}
+	if strings.Contains(out.SafeText, "bob@example.org") {
+		t.Errorf("safe_text must not contain the email: %q", out.SafeText)
+	}
+	if !strings.Contains(out.SafeText, "REDACTED") {
+		t.Errorf("safe_text should contain REDACTED placeholders: %q", out.SafeText)
+	}
+}
+
 // fakeDecider lets tests simulate the native confirmation dialog.
 type fakeDecider struct{ allowed bool }
 

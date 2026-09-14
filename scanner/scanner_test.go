@@ -101,6 +101,33 @@ func TestScanGenericPassword(t *testing.T) {
 	}
 }
 
+// TestScanGenericPasswordExtractsValueOnly ensures the detection Match is just
+// the sensitive value, not the whole "password is ..." phrase, so masking keeps
+// the surrounding words intact.
+func TestScanGenericPasswordExtractsValueOnly(t *testing.T) {
+	s := New()
+	for _, tt := range []struct {
+		input string
+		want  string
+	}{
+		{"my password is Panda@167", "Panda@167"},
+		{"password was Panda@167", "Panda@167"},
+		{"password: Panda@167", "Panda@167"},
+		{"password=Panda@167", "Panda@167"},
+	} {
+		detections := s.Scan(tt.input)
+		var match string
+		for _, d := range detections {
+			if d.Name == "Generic_Password" {
+				match = d.Match
+			}
+		}
+		if match != tt.want {
+			t.Errorf("Scan(%q): Generic_Password match = %q, want %q", tt.input, match, tt.want)
+		}
+	}
+}
+
 func TestRedact(t *testing.T) {
 	s := New()
 	input := "Send to john@test.com and my SSN 123-45-6789"
