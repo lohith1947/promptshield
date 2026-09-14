@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "promptshield",
-  "version": "0.4.0",
+  "name": "promptshield - AI prompt privacy guard",
+  "version": "0.5.0",
   "description": "Blocks sensitive data from being sent to AI chat sites. Every prompt is scanned by your local promptshield gateway before it leaves the browser. Offers block, mask & send, or send-anyway on detection.",
   "permissions": ["storage"],
   "host_permissions": [
@@ -19,9 +19,17 @@
         "*://chat.openai.com/*",
         "*://claude.ai/*",
         "*://gemini.google.com/*",
+        "*://grok.com/*",
+        "*://x.com/i/grok/*",
         "*://copilot.microsoft.com/*",
         "*://chat.deepseek.com/*",
-        "*://www.perplexity.ai/*"
+        "*://www.perplexity.ai/*",
+        "*://you.com/*",
+        "*://poe.com/*",
+        "*://chat.mistral.ai/*",
+        "*://meta.ai/*",
+        "*://huggingface.co/chat/*",
+        "*://chat.duckduckgo.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"

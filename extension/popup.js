@@ -6,13 +6,19 @@ const statusText = document.getElementById('statusText');
 const verdict = document.getElementById('verdict');
 
 function setStatus(ok) {
-  dot.classList.toggle('ok', ok);
+  dot.classList.remove('ok', 'bad');
+  dot.classList.add(ok ? 'ok' : 'bad');
   statusText.textContent = ok ? 'gateway online' : 'gateway offline';
 }
 
 fetch(GATEWAY + '/healthz')
   .then((r) => setStatus(r.ok))
   .catch(() => setStatus(false));
+
+document.getElementById('privacyLink').addEventListener('click', (e) => {
+  e.preventDefault();
+  chrome.tabs.create({ url: 'https://github.com/lohith1947/promptshield/blob/main/PRIVACY.md' });
+});
 
 function showVerdict(data) {
   verdict.className = '';

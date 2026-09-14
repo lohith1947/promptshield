@@ -187,3 +187,153 @@ func TestIsPrivateIP(t *testing.T) {
 		})
 	}
 }
+
+func TestIsValidIPv4(t *testing.T) {
+	tests := []struct {
+		ip   string
+		want bool
+	}{
+		{"8.8.8.8", true},
+		{"192.168.1.1", true},
+		{"255.255.255.255", true},
+		{"999.1.1.1", false},
+		{"256.0.0.1", false},
+		{"1.2.3", false},
+		{"1.2.3.4.5", false},
+		{"a.b.c.d", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.ip, func(t *testing.T) {
+			if got := isValidIPv4(tt.ip); got != tt.want {
+				t.Errorf("isValidIPv4(%q) = %v, want %v", tt.ip, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestScanIPv4RejectsInvalidOctets(t *testing.T) {
+	s := New()
+	for _, tt := range []struct {
+		input string
+		want  bool
+	}{
+		{"server at 203.0.113.7", true},
+		{"version 999.1.1.1 here", false},
+		{"octet 256.0.0.1 invalid", false},
+	} {
+		detections := s.Scan(tt.input)
+		found := false
+		for _, d := range detections {
+			if d.Name == "IPv4" {
+				found = true
+			}
+		}
+		if found != tt.want {
+			t.Errorf("Scan(%q): IPv4 detected = %v, want %v", tt.input, found, tt.want)
+		}
+	}
+}
+
+func TestScanSSNLeadingZeroExcluded(t *testing.T) {
+	s := New()
+	detections := s.Scan("SSN: 012345678")
+	for _, d := range detections {
+		if d.Name == "SSN_NoDash" {
+			t.Error("expected leading-zero 9-digit string to be excluded")
+		}
+	}
+}
+
+func TestScanPassportRequiresTwoLetters(t *testing.T) {
+	s := New()
+	// One letter + digits is a common order/product code; tightened to 2 letters.
+	detections := s.Scan("order A1234567 was shipped")
+	for _, d := range detections {
+		if d.Name == "Passport" {
+			t.Error("expected single-letter passport pattern to be excluded")
+		}
+	}
+	det := s.Scan("passport AB1234567")
+	found := false
+	for _, d := range det {
+		if d.Name == "Passport" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected two-letter passport pattern to be detected")
+	}
+}
+
+func TestScanNewProviderKeys(t *testing.T) {
+	s := New()
+	tests := []struct {
+		input string
+		name  string
+	}{
+		{"gitlab token " + "glpat-" + "xYzAbC1234567890abcd", "GitLab_PAT"},
+		{"groq key " + "gsk_" + "AbCdEf1234567890abcdEf1234", "Groq_Key"},
+		{"perplexity " + "pplx-" + "8f3kLmNopQrStUvWxYzA1", "Perplexity_Key"},
+		{"sendgrid " + "SG." + "7Qx3Kd9F2aZj1LmNe8VbXc0d.YsGqP4r8LjW9NfH2vTzC5a", "SendGrid_Key"},
+		{"twilio api sid " + "SK" + "1f0b56789abcdef0123456789abcdef1", "Twilio_API_SID"},
+		{"npm token " + "npm_" + "8fA2kLmN3bCdE4fGh5iJkLmN6oPqRsT7uVwXyZ", "npm_Token"},
+		{"hf token " + "hf_" + "dJfL9kR2mT8bV4nH6pQ1sW5xZ7aC3e", "HuggingFace_Token"},
+		{"discord token " + "MTIzNDU2Nzg5MDEyMzQ1Ng" + "." + "5fQ2bW" + "." + "0V8cLfW3k6p9ZtHsXqR2nBmKeY1dCjFlZaGxYv3t", "Discord_Token"},
+		{"gemini api key " + "AIzaSy" + "7dFj9kLmNoPqRsT2uVwXyZ3aBcDeFgH4", "Gemini_API_Key"},
+		{"grok api key " + "xai-" + "8f3kLmNopQrStUvWxYzA1B2", "xAI_API_Key"},
+		{"azure openai api key: " + "5f3c4d2b7a91e8f6c40d5a2b9e7f3c81d2b6a4f5", "Azure_OpenAI_Key"},
+		{"gcp key {\"private_key\": \"-----BEGIN PRIVATE KEY-----\\nabcy\"}", "GCP_Service_Account"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detections := s.Scan(tt.input)
+			found := false
+			for _, d := range detections {
+				if d.Name == tt.name {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("Scan(%q): %s not detected", tt.input, tt.name)
+			}
+		})
+	}
+}
+
+func TestScanPasswordIsColonForm(t *testing.T) {
+	s := New()
+	detections := s.Scan("my vault password is: MidnightFox!")
+	found := false
+	for _, d := range detections {
+		if d.Name == "Generic_Password" && d.Match == "MidnightFox!" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected 'password is: VALUE' to be detected with value-only match")
+	}
+}
+
+func TestScanPasswordValueOnlyVariants(t *testing.T) {
+	s := New()
+	for _, tt := range []struct {
+		input string
+		want  string
+	}{
+		{"my password is: MidnightFox!", "MidnightFox!"},
+		{"my aws password was: ThunderStorm!", "ThunderStorm!"},
+	} {
+		detections := s.Scan(tt.input)
+		var match string
+		for _, d := range detections {
+			if d.Name == "Generic_Password" {
+				match = d.Match
+			}
+		}
+		if match != tt.want {
+			t.Errorf("Scan(%q): match = %q, want %q", tt.input, match, tt.want)
+		}
+	}
+}

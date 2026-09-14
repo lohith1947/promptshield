@@ -125,7 +125,8 @@ function injectDialogStyles() {
     '  from { opacity:0; transform:translate(-50%,-18px); }',
     '  to   { opacity:1; transform:translate(-50%,0); }',
     '}',
-    'button.promptshield-psbtn:hover { filter:brightness(1.12); }',
+    'button.promptshield-psbtn { font-family:Roboto,"Segoe UI",system-ui,sans-serif; }',
+    'button.promptshield-psbtn:hover { filter:brightness(1.06); box-shadow:0 1px 3px 0 rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15); }',
   ].join('\n');
   (document.head || document.documentElement).appendChild(style);
 }
@@ -144,32 +145,32 @@ function showDecisionDialog(names, el, originalEvent, safeText) {
   card.style.cssText = [
     'position:fixed', 'top:16px', 'left:50%', 'z-index:2147483647',
     'width:min(560px,calc(100vw - 32px))', 'box-sizing:border-box',
-    'background:rgba(22,29,40,.98)', 'border:1px solid rgba(255,255,255,.1)',
-    'border-radius:12px', 'box-shadow:0 18px 50px rgba(0,0,0,.5)',
-    'padding:16px 18px 16px 22px', 'font:14px/1.5 system-ui',
-    'animation:promptshield-drop 260ms cubic-bezier(.2,.7,.3,1) both',
+    'background:#ffffff', 'border:1px solid #dadce0',
+    'border-radius:16px', 'box-shadow:0 6px 16px 0 rgba(0,0,0,.2), 0 1px 6px 0 rgba(0,0,0,.12)',
+    'padding:20px 22px', 'font:400 14px/1.5 Roboto,"Segoe UI",system-ui,sans-serif',
+    'color:#202124', 'animation:promptshield-drop 260ms cubic-bezier(.2,.7,.3,1) both',
   ].join(';');
 
   const accent = document.createElement('div');
-  accent.style.cssText = 'position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:2px;background:linear-gradient(180deg,#ef5350,#ff7043);';
+  accent.style.cssText = 'position:absolute;left:0;top:14px;bottom:14px;width:4px;border-radius:2px;background:#d93025;';
   card.appendChild(accent);
 
   const header = document.createElement('div');
-  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;';
+  header.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:12px;';
 
   const titleWrap = document.createElement('div');
-  titleWrap.style.cssText = 'display:flex;align-items:center;gap:10px;min-width:0;';
+  titleWrap.style.cssText = 'display:flex;align-items:center;gap:11px;min-width:0;';
 
   const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  icon.setAttribute('width', '18');
-  icon.setAttribute('height', '18');
+  icon.setAttribute('width', '20');
+  icon.setAttribute('height', '20');
   icon.setAttribute('viewBox', '0 0 24 24');
-  icon.setAttribute('fill', 'rgba(239,83,80,.14)');
+  icon.setAttribute('fill', 'none');
   icon.style.cssText = 'flex:none;';
-  icon.innerHTML = '<path d="M12 2l8 3.2V11c0 4.7-3.3 8.3-8 11-4.7-2.7-8-6.3-8-11V5.2L12 2z" stroke="#ef5350" stroke-width="1.8"/><path d="M9 11.6l2.1 2.1 4.1-4.3" stroke="#ef5350" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
+  icon.innerHTML = '<path d="M12 2l8 3.2V11c0 4.7-3.3 8.3-8 11-4.7-2.7-8-6.3-8-11V5.2L12 2z" stroke="#d93025" stroke-width="1.6" fill="#fce8e6"/><path d="M9 11.6l2.1 2.1 4.1-4.3" stroke="#d93025" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
 
   const title = document.createElement('div');
-  title.style.cssText = 'font-weight:700;font-size:14px;color:#f0f5fa;letter-spacing:.1px;';
+  title.style.cssText = 'font-weight:500;font-size:16px;color:#202124;letter-spacing:.1px;';
   title.textContent = 'Sensitive data detected';
 
   const closeBtn = document.createElement('button');
@@ -178,53 +179,53 @@ function showDecisionDialog(names, el, originalEvent, safeText) {
   closeBtn.title = "Cancel — keep your prompt, don't send";
   closeBtn.setAttribute('aria-label', 'Close dialog');
   closeBtn.style.cssText = [
-    'flex:none','width:26px','height:26px','border:none','border-radius:6px',
-    'background:transparent','color:#8aa0b8','font:600 18px/1 system-ui',
+    'flex:none','width:32px','height:32px','border:none','border-radius:50%',
+    'background:transparent','color:#5f6368','font:400 20px/1 Roboto,"Segoe UI",sans-serif',
     'cursor:pointer',
   ].join(';');
-  closeBtn.addEventListener('mouseenter', () => { closeBtn.style.color = '#fff'; });
-  closeBtn.addEventListener('mouseleave', () => { closeBtn.style.color = '#8aa0b8'; });
+  closeBtn.addEventListener('mouseenter', () => { closeBtn.style.background = '#f8f9fa'; });
+  closeBtn.addEventListener('mouseleave', () => { closeBtn.style.background = 'transparent'; });
 
   const body = document.createElement('div');
-  body.style.cssText = 'margin:12px 0 0;';
+  body.style.cssText = 'margin:14px 0 0;';
 
   const chips = document.createElement('div');
   chips.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;';
   (nameList || ['sensitive data']).forEach((n) => {
     const chip = document.createElement('span');
     chip.style.cssText = [
-      'font:600 11px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace',
-      'color:#ff8a80','background:rgba(231,76,60,.14)',
-      'border:1px solid rgba(231,76,60,.35)','border-radius:999px',
-      'padding:3px 9px',
+      'font:500 11px/1.4 Roboto,"Segoe UI",system-ui,sans-serif',
+      'color:#c5221f','background:#fce8e6',
+      'border:1px solid #f2a19c','border-radius:8px',
+      'padding:4px 10px',
     ].join(';');
     chip.textContent = n;
     chips.appendChild(chip);
   });
   if (Array.isArray(names) && names.length > 8) {
     const more = document.createElement('span');
-    more.style.cssText = 'font:600 11px/1.4 system-ui;color:#8aa0b8;padding:3px 4px;';
+    more.style.cssText = 'font:400 11px/1.4 Roboto,"Segoe UI",sans-serif;color:#5f6368;padding:4px 4px;';
     more.textContent = '+' + (names.length - 8) + ' more';
     chips.appendChild(more);
   }
 
   const msg = document.createElement('div');
-  msg.style.cssText = 'color:#94a7bd;font-size:12.5px;margin:10px 0 0;';
+  msg.style.cssText = 'color:#5f6368;font-size:13px;margin:12px 0 0;';
   msg.textContent = 'Your prompt was NOT sent and is still in the input box. ' +
     '"Mask & send" replaces the flagged values with placeholders before sending; ' +
     'sending it anyway will expose this data to the AI provider.';
 
   const actions = document.createElement('div');
-  actions.style.cssText = 'display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07);';
+  actions.style.cssText = 'display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:20px;';
 
   const blockBtn = document.createElement('button');
   blockBtn.type = 'button';
   blockBtn.textContent = "Block (don't send)";
   blockBtn.title = 'Keep your prompt; nothing is sent';
   blockBtn.style.cssText = [
-    'font:600 13px/1 system-ui','padding:10px 16px','border-radius:8px',
-    'cursor:pointer','color:#eef3f9','background:#333f52',
-    'border:1px solid rgba(255,255,255,.12)',
+    'font:500 14px/1 Roboto,"Segoe UI",system-ui,sans-serif','padding:0 22px','height:36px',
+    'border-radius:4px','cursor:pointer','color:#ffffff','background:#d93025',
+    'border:none','box-shadow:0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15)',
   ].join(';');
 
   const maskBtn = document.createElement('button');
@@ -232,9 +233,9 @@ function showDecisionDialog(names, el, originalEvent, safeText) {
   maskBtn.textContent = 'Mask & send';
   maskBtn.title = 'Replace the sensitive values with placeholders, then send';
   maskBtn.style.cssText = [
-    'font:600 13px/1 system-ui','padding:10px 16px','border-radius:8px',
-    'cursor:pointer','color:#a5d6a7','background:rgba(124,179,66,.14)',
-    'border:1px solid rgba(124,179,66,.5)',
+    'font:500 14px/1 Roboto,"Segoe UI",system-ui,sans-serif','padding:0 22px','height:36px',
+    'border-radius:4px','cursor:pointer','color:#1a73e8','background:#ffffff',
+    'border:1px solid #dadce0',
   ].join(';');
 
   const sendBtn = document.createElement('button');
@@ -242,9 +243,9 @@ function showDecisionDialog(names, el, originalEvent, safeText) {
   sendBtn.textContent = 'Send it anyway';
   sendBtn.title = 'Send despite the warning; data leaves this machine';
   sendBtn.style.cssText = [
-    'font:600 13px/1 system-ui','padding:10px 16px','border-radius:8px',
-    'cursor:pointer','color:#ffc46b','background:rgba(245,166,35,.14)',
-    'border:1px solid rgba(245,166,35,.55)',
+    'font:500 14px/1 Roboto,"Segoe UI",system-ui,sans-serif','padding:0 10px','height:36px',
+    'border-radius:4px','cursor:pointer','color:#b06000','background:transparent',
+    'border:none',
   ].join(';');
 
   const onEsc = (ev) => {
@@ -348,23 +349,30 @@ function attach() {
     if (el && readText(el).trim()) intercept(el, e);
   }, true);
 
-  // Status pill
+  // Status pill (Material-style floating chip)
   const pill = document.createElement('div');
   pill.id = 'promptshield-pill';
   pill.style.cssText = [
-    'position:fixed', 'bottom:14px', 'right:14px', 'z-index:2147483646',
-    'padding:6px 12px', 'border-radius:999px', 'font:600 12px system-ui',
-    'background:rgba(0,0,0,.75)', 'color:#7CB342',
+    'position:fixed', 'bottom:16px', 'right:16px', 'z-index:2147483646',
+    'padding:10px 16px', 'border-radius:8px',
+    'font:500 12px/1.4 Roboto,"Segoe UI",system-ui,sans-serif',
+    'background:#ffffff', 'color:#202124',
+    'border:1px solid #dadce0',
+    'box-shadow:0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15)',
   ].join(';');
-  pill.textContent = 'promptshield: checking...';
+  pill.textContent = 'promptshield: checking…';
   document.body.appendChild(pill);
 
   const update = () => {
     fetch(GATEWAY + '/healthz', { method: 'GET' }).then((res) => {
-      pill.style.color = res.ok ? '#7CB342' : '#e74c3c';
+      pill.style.color = res.ok ? '#137333' : '#c5221f';
+      pill.style.borderColor = res.ok ? '#ceead6' : '#f2a19c';
+      pill.style.background = res.ok ? '#e6f4ea' : '#fce8e6';
       pill.textContent = res.ok ? 'promptshield: protected' : 'promptshield: gateway offline (fail-open)';
     }).catch(() => {
-      pill.style.color = '#e74c3c';
+      pill.style.color = '#c5221f';
+      pill.style.borderColor = '#f2a19c';
+      pill.style.background = '#fce8e6';
       pill.textContent = 'promptshield: gateway offline (fail-open)';
     });
   };

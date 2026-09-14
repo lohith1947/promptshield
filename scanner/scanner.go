@@ -83,9 +83,9 @@ func (s *Scanner) Scan(text string) []Detection {
 				}
 			}
 
-			// Filter IPv4 false positives for private ranges
+			// Filter IPv4 false positives for private ranges + invalid octets
 			if p.Name == "IPv4" {
-				if isPrivateIP(match) {
+				if !isValidIPv4(match) || isPrivateIP(match) {
 					continue
 				}
 			}
@@ -155,6 +155,30 @@ func luhnCheck(num string) bool {
 		alternate = !alternate
 	}
 	return sum%10 == 0
+}
+
+// isValidIPv4 rejects malformed octets like 999.1.1.1 or "256" values
+func isValidIPv4(ip string) bool {
+	parts := strings.Split(ip, ".")
+	if len(parts) != 4 {
+		return false
+	}
+	for _, part := range parts {
+		if part == "" {
+			return false
+		}
+		n := 0
+		for _, ch := range part {
+			if ch < '0' || ch > '9' {
+				return false
+			}
+			n = n*10 + int(ch-'0')
+		}
+		if n > 255 {
+			return false
+		}
+	}
+	return true
 }
 
 // isPrivateIP checks if an IPv4 is in private ranges
