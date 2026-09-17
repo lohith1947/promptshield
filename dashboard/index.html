@@ -272,7 +272,7 @@ async function refresh() {
 
   try {
     const logRes = await fetch('/api/log');
-    const entries = await logRes.json();
+    const entries = (await logRes.json()).reverse(); // newest first
     const feed = document.getElementById('feed');
     document.getElementById('count').textContent = entries.length ? 'last ' + entries.length : '';
 
