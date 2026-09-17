@@ -489,6 +489,9 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, body []byte, kn
 				Detections:   detectionNames(decision.Detections),
 			}
 			s.al.Record(entry)
+			// The body differs from upstream, so drop the copied
+			// Content-Length or the server will truncate the response.
+			w.Header().Del("Content-Length")
 			writeJSONError(w, http.StatusForbidden, "Response blocked by promptshield: sensitive data echoed back ("+strings.Join(decision.BlockedNames, ", ")+")")
 			return
 		case policy.ActionRedact:
@@ -501,6 +504,8 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, body []byte, kn
 				Detections: detectionNames(decision.Detections),
 			}
 			s.al.Record(entry)
+			// Redaction changes the body length; let the server recompute.
+			w.Header().Del("Content-Length")
 			w.WriteHeader(resp.StatusCode)
 			w.Write(safe)
 			return
