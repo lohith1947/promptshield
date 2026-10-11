@@ -8,7 +8,8 @@
 
 - The extension **never transmits your prompts to any remote server**.
 - Every prompt is scanned **locally in your browser** by the extension's built-in scanner. If the optional local gateway is also running, the text is sent **only to a local gateway at `127.0.0.1:8080`** that runs on your machine.
-- Nothing you type is uploaded, stored, or shared with the extension's developer or any third party.
+- Nothing you type is uploaded or shared with the extension's developer or any third party.
+- The only thing saved in your browser is a set of anonymous counters (how many prompts were detected as sensitive, and how many you blocked, masked or sent anyway). Prompts containing nothing sensitive are not counted. Your prompt text and sensitive values are never saved.
 - The gateway, if installed and running, keeps an **audit log on your own machine only** to record what it blocked and why.
 
 ## What the extension accesses
@@ -27,7 +28,7 @@ While you are on one of those sites, the extension reads the text you type into 
 ## What is stored
 
 - **Local Gateway**: If you run the optional promptshield gateway, it can keep an audit log (`audit.jsonl`) on your computer recording detections (type of data found, timestamp). This file stays on your machine and is never uploaded.
-- **Extension storage**: The extension does not store any data. It uses no storage.
+- **Extension storage**: The extension stores only four anonymous counters in your browser's local extension storage: how many prompts were **detected** as containing sensitive data, how many of those you **blocked**, how many you **masked and sent**, how many you **sent anyway**, and the date counting began. These are plain numbers kept on your device. Prompts that contained nothing sensitive are never counted. **Your prompt text, the sensitive values, and the names of detected data types are never written to storage.** You can erase the counters at any time with the "Reset" link in the extension popup, or by uninstalling the extension.
 - **Nothing remote**: The extension has no server, no analytics, no telemetry, and no advertising. The developer does not collect, receive, or see any of your prompts.
 
 ## What happens if the gateway is not running
@@ -36,7 +37,7 @@ The extension's built-in scanner keeps working — prompts are still scanned loc
 
 ## Your data is yours
 
-Because all processing happens on your device, there is nothing for the developer to delete, export, or correct. You can stop collection entirely by uninstalling the extension or pressing the browser's extension toggle to disable it. To remove the local audit log, delete the gateway's log file on your machine.
+Because all processing happens on your device, there is nothing for the developer to delete, export, or correct. You can stop collection entirely by uninstalling the extension or pressing the browser's extension toggle to disable it. The extension's counters can be cleared at any time from the "Reset" link in the popup. To remove the local audit log, delete the gateway's log file on your machine.
 
 ## Third parties
 
