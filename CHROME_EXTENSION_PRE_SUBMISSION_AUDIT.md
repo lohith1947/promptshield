@@ -298,3 +298,27 @@ The `chrome.tabs.create` call itself was correct and needed no permission, so th
 - Giving the anchor a real `href` + `target="_blank" rel="noopener noreferrer"` instead of `href="#"`, so it still resolves if scripts fail to load.
 
 This also corrects the audit's §5 table row, which described the URL as a GitHub blob link; the destination is now the Pages URL.
+
+---
+
+## 16. Submission rejected — Keyword Spam (routing ID FZSL)
+
+**Item ID:** `fbilnaocjofkfklgekfffklliginlbnc` · **Violation reference:** Yellow Argon
+
+**Reason:** "Having excessive and / or irrelevant keywords in the item's description." The cited text was the 13-site enumeration in the opening paragraph *and* the repeated 15-domain `Works on:` list.
+
+**Root cause — an error in this audit's own guidance.** §6 warned that the privacy policy listing only 7 sites against 15 manifest matches was "the highest-risk item in this audit." That reasoning was sound for **PRIVACY.md**, where the list is a factual disclosure obligation. It was then carried into the **store description**, where enumerating every supported site is keyword stuffing under the metadata policy. The two contexts were conflated: a *disclosure* requirement, not a *marketing copy* requirement.
+
+**Fix applied to the description only:**
+- Removed the 13-site prose enumeration.
+- Removed the 15-domain `Works on:` list entirely.
+- Replaced with a generic "AI chat websites" and a pointer: *"The full list of supported sites is documented in the privacy policy."*
+- The manifest's `content_scripts.matches` and `PRIVACY.md` still list all 15 sites — the disclosure obligation is met there, which is where the store actually validates it.
+
+Verified after editing: zero site names and zero domain tokens remain in the detailed description. Name (38 chars), short description (123) and single purpose (160) were never affected and are unchanged.
+
+**Not appealing.** The violation is legitimate, not a false positive.
+
+**Package unchanged** — this is a metadata-only violation. The ZIP is not re-uploaded and the manifest version stays `1.0.0`, since `1.0.0` was never published.
+
+**Lesson for the audit:** §6's site-count check should be scoped to `PRIVACY.md` and `STORE-LISTING.md`'s disclosure sections only. Never add a domain list to promotional copy.
