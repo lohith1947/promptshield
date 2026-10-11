@@ -1,9 +1,8 @@
-// promptshield popup — gateway + scan status, manual scanner, light/dark theme.
+// promptshield popup — protection status + lifetime counters, light/dark theme.
 
 const GATEWAY = 'http://127.0.0.1:8080';
 const dot = document.getElementById('dot');
 const statusText = document.getElementById('statusText');
-const verdict = document.getElementById('verdict');
 
 // ---- theme (auto by default, remembered in this page's localStorage) ----
 const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -51,121 +50,77 @@ fetch(GATEWAY + '/healthz')
   .then((r) => setStatus(r.ok))
   .catch(() => setStatus(false));
 
+// The store listing points at the published Pages URL, so use the same one here.
+// PRIVACY.md is only published from the gh-pages branch; the repo's default
+// branch is master and has no PRIVACY.md at its root, so a blob/main link 404s.
+const PRIVACY_URL = 'https://lohith1947.github.io/promptshield/PRIVACY.md';
+
 document.getElementById('privacyLink').addEventListener('click', (e) => {
   e.preventDefault();
-  chrome.tabs.create({ url: 'https://github.com/lohith1947/promptshield/blob/main/PRIVACY.md' });
+  chrome.tabs.create({ url: PRIVACY_URL }, () => {
+    // Opening a tab can close the popup; if the callback reports an error,
+    // fall back to a normal navigation so the link is never dead.
+    if (chrome.runtime.lastError) window.open(PRIVACY_URL, '_blank', 'noopener');
+  });
 });
 
-// ---- verdict cards ----
-const ICONS = {
-  pass: '<path d="M5 12.5l4.6 4.6L19 7.4" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
-  block: '<path d="M12 8v5M12 16.4v.2" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/><circle cx="12" cy="12" r="8.4" stroke="currentColor" stroke-width="1.9" fill="none"/>',
-  redact: '<path d="M12 4l7 2.8V11c0 4.1-2.9 7.3-7 9-4.1-1.7-7-4.9-7-9V6.8L12 4z" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linejoin="round"/>',
-  log: '<path d="M4 6.5h16M4 12h16M4 17.5h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
-};
+// ---- stats dashboard ----
+// Only prompts the scanner actually flagged are counted, so these four numbers
+// describe real detections rather than browsing volume. They reconcile:
+//
+//   detected == blocked + masked + anyway
+//
+// "Sent" deliberately means "sent anyway" — a prompt that was flagged and then
+// transmitted unmodified. A clean prompt that passed through is never counted,
+// because inflating the total with every safe message would bury the one
+// number that actually matters.
+const CARDS = [
+  { id: 'Detected', key: 'detected' },
+  { id: 'Blocked', key: 'blocked' },
+  { id: 'Masked', key: 'masked' },
+  { id: 'Sent', key: 'anyway' },
+];
 
-function showVerdict(data) {
-  verdict.className = '';
-  verdict.innerHTML = '';
+const sinceText = document.getElementById('since');
+const hSent = document.getElementById('hSent');
+const noteText = document.getElementById('noteText');
 
-  const state = data.verdict === 'redact' ? 'redact' : data.verdict;
-  verdict.classList.add('show', 'state-' + state);
+function plural(n, one, many) {
+  return n + ' ' + (n === 1 ? one : many);
+}
 
-  const icon = document.createElement('div');
-  icon.className = 'vicon';
-  icon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24">' + (ICONS[state] || ICONS.log) + '</svg>';
+function render(s) {
+  CARDS.forEach((c) => {
+    const n = s[c.key] || 0;
+    document.getElementById('n' + c.id).textContent = String(n);
+    document.getElementById('c' + c.id).classList.toggle('zero', n === 0);
+  });
 
-  const title = document.createElement('div');
-  title.className = 'vtitle';
-  const sub = document.createElement('div');
-  sub.className = 'vsub';
-  const names = (data.blocked_names && data.blocked_names.length)
-    ? data.blocked_names
-    : (data.detections || []).map((d) => d.name);
-  const crit = (data.detections || []).filter((d) => d.severity === 'critical').length;
+  hSent.textContent = plural(s.anyway || 0, 'flagged prompt sent', 'flagged prompts sent') + ' anyway';
 
-  if (state === 'pass') {
-    title.textContent = 'No sensitive data detected';
-    sub.textContent = 'Looks safe — a prompt like this would go through.';
-  } else if (state === 'block') {
-    title.textContent = 'Critical data found — blocked';
-    sub.textContent = crit + ' critical finding' + (crit === 1 ? '' : 's') +
-      '. Nothing was sent; ' + (names.length || 'the flagged data') + ' stays in your box.';
-  } else if (state === 'redact') {
-    title.textContent = 'Would be masked before sending';
-    sub.textContent = 'These become ' + (names.length || 'sensitive') + ' placeholders first.';
+  if (s.since) {
+    const d = new Date(s.since);
+    const sameDay = new Date().toDateString() === d.toDateString();
+    const when = sameDay
+      ? 'today'
+      : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    sinceText.textContent = 'Counting since ' + when;
   } else {
-    title.textContent = 'Sensitive data found — logged';
-    sub.textContent = 'Logged to your local audit trail.';
+    sinceText.textContent = 'No sensitive prompts yet';
   }
 
-  verdict.appendChild(icon);
-  verdict.appendChild(title);
-  verdict.appendChild(sub);
-
-  if (names && names.length) {
-    const wrap = document.createElement('div');
-    wrap.className = 'vnames';
-    names.forEach((n) => {
-      const chip = document.createElement('span');
-      chip.textContent = n;
-      wrap.appendChild(chip);
-    });
-    verdict.appendChild(wrap);
+  if ((s.anyway || 0) > 0) {
+    noteText.textContent = plural(s.anyway, 'prompt was', 'prompts were') +
+      ' sent as-is after a warning. Those reached the AI provider with the ' +
+      'sensitive values still in them.';
+  } else {
+    noteText.textContent = 'Only these counts are stored on this device. Your ' +
+      'prompt text and the sensitive values themselves are never saved.';
   }
 }
 
-// ---- masked version ----
-const maskedBox = document.getElementById('masked');
-const maskedText = document.getElementById('maskedText');
-const copyMasked = document.getElementById('copyMasked');
+PromptShieldStats.read().then(render);
 
-function showMasked(safeText) {
-  if (!safeText) {
-    maskedBox.classList.remove('show');
-    return;
-  }
-  maskedText.value = safeText;
-  maskedBox.classList.add('show');
-}
-
-copyMasked.addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.writeText(maskedText.value);
-    copyMasked.textContent = 'Copied';
-    setTimeout(() => (copyMasked.textContent = 'Copy'), 1200);
-  } catch (_e) {
-    maskedText.select();
-    document.execCommand('copy');
-  }
-});
-
-// ---- scan ----
-document.getElementById('scan').addEventListener('click', async () => {
-  const text = document.getElementById('text').value.trim();
-  if (!text) {
-    maskedBox.classList.remove('show');
-    return;
-  }
-  verdict.className = '';
-  verdict.classList.remove('show');
-  maskedBox.classList.remove('show');
-
-  let data;
-  // Prefer the local gateway for consistency with the dashboard/audit log;
-  // fall back to the in-page scanner when it is unreachable or missing.
-  try {
-    const res = await fetch(GATEWAY + '/api/scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-    });
-    if (!res.ok) throw new Error('bad status ' + res.status);
-    data = await res.json();
-  } catch (_e) {
-    data = PromptShieldScanner.scanText(text);
-    setStatus(false);
-  }
-  showVerdict(data);
-  showMasked(data.safe_text);
+document.getElementById('reset').addEventListener('click', () => {
+  PromptShieldStats.reset().then(render);
 });

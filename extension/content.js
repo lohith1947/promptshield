@@ -34,19 +34,75 @@ function getPal() {
   };
 }
 
+// Counters are telemetry only. They must never be able to break interception:
+// a missing or broken stats.js would otherwise throw inside the send handler
+// and silently swallow the prompt instead of showing the decision dialog.
+function bumpStats(field) {
+  try {
+    if (typeof PromptShieldStats !== 'undefined' && PromptShieldStats && PromptShieldStats.bump) {
+      return PromptShieldStats.bump(field);
+    }
+  } catch (_e) { /* counters are best-effort */ }
+  return Promise.resolve();
+}
+
+// Interception diagnostics. A missed send is the worst failure mode for a
+// privacy guard: the prompt leaves with no warning and nothing on screen says
+// why. Counting these makes "it let my prompt through" diagnosable.
+const MISSES = { total: 0, last: '' };
+
+function recordMiss(reason) {
+  MISSES.total += 1;
+  MISSES.last = reason;
+}
+
 function isEditable(el) {
-  return el && (el.tagName === 'TEXTAREA' || (el.getAttribute && el.getAttribute('contenteditable') === 'true'));
+  if (!el || !el.tagName) return false;
+  if (el.tagName === 'TEXTAREA') return !el.disabled && !el.readOnly;
+  // contenteditable may be "true", "" or "plaintext-only" depending on the
+  // framework, so treat any value other than "false" as editable.
+  const attr = el.getAttribute && el.getAttribute('contenteditable');
+  return attr != null && attr !== 'false';
+}
+
+// Ordered most-specific first. Only elements that are actually on screen and
+// not disabled are accepted: chat UIs keep hidden composers around (edit-reply
+// flows, archived chats), and picking one of those would scan the wrong element
+// and let the real prompt through untouched.
+const INPUT_SELECTORS = [
+  '#prompt-textarea',                            // ChatGPT
+  '#user-input',                                 // Claude
+  'div[contenteditable][role="textbox"]',        // ProseMirror editors
+  'textarea[placeholder]',
+  'textarea',
+  'div[contenteditable]',
+];
+
+function isUsableInput(el) {
+  if (!el) return false;
+  if (el.disabled || el.readOnly) return false;
+  if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return false;
+  const r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+  if (r && (r.width < 2 || r.height < 2)) return false;
+  return true;
 }
 
 // Find the active prompt input (ChatGPT/Claude use contenteditable divs,
 // Gemini and older UIs use textareas).
 function findInput() {
   const focused = document.activeElement;
-  if (isEditable(focused)) return focused;
-  const selectors = ['#prompt-textarea', 'div[contenteditable="true"]', 'textarea'];
-  for (const sel of selectors) {
-    const el = document.querySelector(sel);
-    if (el) return el;
+  if (isEditable(focused) && isUsableInput(focused)) return focused;
+
+  for (const sel of INPUT_SELECTORS) {
+    const nodes = document.querySelectorAll(sel);
+    let fallback = null;
+    for (const el of nodes) {
+      if (isUsableInput(el)) return el;
+      // Keep the first editable match so a zero-size custom composer is still
+      // scanned rather than silently skipped.
+      if (!fallback && isEditable(el)) fallback = el;
+    }
+    if (fallback) return fallback;
   }
   return null;
 }
@@ -332,6 +388,8 @@ function showDecisionDialog(names, el, originalEvent, safeText) {
     decisionOpen = false;
     window.removeEventListener('keydown', onEsc, true);
     card.remove();
+    // Block, the close button and Escape all land here: nothing was sent.
+    bumpStats('blocked');
   };
 
   blockBtn.addEventListener('click', close);
@@ -341,6 +399,7 @@ function showDecisionDialog(names, el, originalEvent, safeText) {
     decisionOpen = false;
     window.removeEventListener('keydown', onEsc, true);
     card.remove();
+    bumpStats('masked');
     // Rewrite the composer with the masked text, then send. A short delay lets
     // the input event propagate so the chat UI reads the new text.
     if (safeText) {
@@ -355,6 +414,9 @@ function showDecisionDialog(names, el, originalEvent, safeText) {
     decisionOpen = false;
     window.removeEventListener('keydown', onEsc, true);
     card.remove();
+    // The only branch that reaches the AI provider with the sensitive values
+    // still in them — the reason the popup warns when this is non-zero.
+    bumpStats('anyway');
     reTriggerSend(el, originalEvent);
   });
 
@@ -388,9 +450,12 @@ function intercept(el, e) {
     if (shouldBlock(result.verdict)) {
       if (decisionOpen) return;
       const names = result.blocked_names || (result.detections || []).map((d) => d.name);
+      bumpStats('detected');
       showDecisionDialog(names, el, e, result.safe_text);
       return; // keep the text, nothing was sent yet
     }
+    // Clean prompt: send it, but do not count it. The dashboard reports real
+    // detections, not total prompts typed.
     reTriggerSend(el, e);
   });
 }
@@ -404,18 +469,35 @@ function attach() {
     if (simulating || decisionOpen) return;
     if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
     const el = findInput();
-    if (el) intercept(el, e);
+    if (el) {
+      intercept(el, e);
+    } else {
+      recordMiss('keydown:no-input');
+    }
   }, true);
 
-  // Send-button clicks
+  // Send-button clicks. Matched broadly: newer chat UIs label the button via
+  // data-testid (e.g. "send-button") or put the icon in a child node, so we
+  // test every identifying attribute plus the visible text.
   document.addEventListener('click', (e) => {
     if (simulating || decisionOpen) return;
-    const btn = e.target && e.target.closest && e.target.closest('button');
+    const btn = e.target && e.target.closest && e.target.closest('button, [role="button"]');
     if (!btn) return;
-    const label = (btn.getAttribute('aria-label') || btn.title || btn.getAttribute('data-testid') || '');
-    if (!/send/i.test(label)) return;
+    const label = [
+      btn.getAttribute('aria-label'),
+      btn.title,
+      btn.getAttribute('data-testid'),
+      btn.getAttribute('data-test-id'),
+      btn.id,
+      btn.innerText || btn.textContent,
+    ].filter(Boolean).join(' ');
+    if (!/send|submit/i.test(label)) return;
     const el = findInput();
-    if (el && readText(el).trim()) intercept(el, e);
+    if (el && readText(el).trim()) {
+      intercept(el, e);
+    } else {
+      recordMiss(el ? 'sendbtn:empty-input' : 'sendbtn:no-input');
+    }
   }, true);
 
   // Status pill (Google-style floating chip, follows system dark/light)
@@ -437,10 +519,22 @@ function attach() {
   const applyPill = (ok) => {
     const p = getPal();
     gatewayOnline = ok;
+    if (MISSES.total > 0) {
+      // Never let a silent pass-through look like protection. Say what broke.
+      pill.style.background = p.accentSoft;
+      pill.style.color = p.chipText;
+      pill.style.borderColor = p.accentBorder;
+      pill.textContent = 'promptshield: missed ' + MISSES.total + ' send' +
+        (MISSES.total === 1 ? '' : 's') + ' (' + MISSES.last + ') — reload the extension';
+      pill.title = 'promptshield could not read your prompt box, so a send was not checked.';
+      return;
+    }
     pill.style.background = p.okBg;
     pill.style.color = p.okText;
     pill.style.borderColor = p.okBorder;
+    pill.style.background = p.okBg;
     pill.textContent = ok ? 'promptshield: protected' : 'promptshield: local scanning active';
+    pill.title = '';
   };
 
   const update = () => {
@@ -453,6 +547,9 @@ function attach() {
   darkMq.addEventListener('change', () => applyPill(gatewayOnline));
   update();
   setInterval(update, 10000);
+  // Re-render promptly if a send was missed, so the warning shows up promptly
+  // rather than on the next 10s poll.
+  setInterval(() => applyPill(gatewayOnline), 2000);
 }
 
 attach();

@@ -220,3 +220,81 @@ Released as **v0.6.0** (`promptshield-0.6.0.zip`). Status of each pre-submission
 - The dark palette is Google's (`#292a2d` surface, `#8ab4f8` primary, `#f28b82`/`#81c995` semantic accents). Still no icons/asset, data, or permission changes; screenshot list unchanged (dark mode can be an extra shot).
 
 **v1.0.0 — submission cut.** Version renumbered `1.0.0` for the store release (`promptshield-1.0.0.zip`), matching manifest, popup footer, and STORE-LISTING. No functional change from 0.6.1.
+
+---
+
+## 15. Follow-up — stats dashboard + interception hardening
+
+**Popup replaced the manual tester.** The "Scan prompt" tester was removed from the popup and replaced with a lifetime activity dashboard: **Detected / Blocked / Masked & sent / Sent**, plus a "Counting since" line, a Reset link, and a privacy footnote. The tester was redundant now that the extension bundles its own engine — the same prompt was being scanned in a dead-end textbox rather than on a real chat site.
+
+**`storage` permission intentionally re-added.** §10 must-fix #1 removed `storage` because it was *unused*. It is now genuinely used, so the original finding no longer applies:
+
+- `extension/stats.js` (new) — stores five integers (`detected`, `sent`, `masked`, `blocked`, `anyway`) plus a `since` timestamp in `chrome.storage.local`. **No prompt text, no detection names, no secret values are written.** Verified by a 21-case test (fresh read, increments, reset, and hostile/corrupt-value coercion).
+- Loaded in the content script via `manifest.json` content_scripts `js: [scanner.js, stats.js, content.js]` and in the popup via a `<script src="stats.js">`.
+- `PRIVACY.md` §"What is stored" updated — it previously stated "The extension does not store any data. It uses no storage", which became false. Now describes the counters, the Reset control, and the absence of prompt text.
+- `STORE-LISTING.md` gained a **Permission justification** section covering `storage` and the loopback host permission, and the screenshot list was rewritten (shots 2 and 3 referenced the removed tester).
+
+**Counting semantics.** Counters bump at the real decision points in `content.js`, not at scan time:
+- `detected` — the decision dialog was raised (content.js `intercept`)
+- `blocked` — Block button, the `×` close button, or Escape (all route through `close()`; nothing was sent)
+- `masked` — "Mask & send" completed
+- `sent` — a clean prompt passed through with no dialog
+- `anyway` — "Send it anyway" (also increments `sent`)
+
+The popup displays `sent - anyway` as "clean prompts passed through" and surfaces `anyway` separately, so the riskiest action is never hidden inside a reassuring number. When `anyway > 0` the footnote switches to a warning naming that count.
+
+### Interception defects found and fixed (post-audit)
+
+A real-world test on chatgpt.com — typing `my password is kwhfiwef969` — resulted in the prompt being **sent with no warning**, despite the scanner correctly returning `redact`/`Generic_Password` (confirmed against both the JS engine and a live `POST /api/scan`; the audit log recorded the detection). The scanner was not at fault; interception was. Three defects were found and fixed:
+
+1. **`findInput()` could silently return the wrong element or `null`, failing open.** It accepted the first `div[contenteditable="true"]` anywhere in the document with no visibility or disabled check. Chat UIs keep hidden/archived composers in the DOM, so promptshield could scan a stale editor and pass the real prompt through untouched — the single worst failure mode for a privacy guard. Now: ordered site-specific selectors (`#prompt-textarea`, `#user-input`, ProseMirror `role="textbox"`, `textarea[placeholder]`, …), an `isUsableInput()` visibility/size/disabled check, and a fallback so a zero-size custom composer is still scanned rather than skipped.
+2. **Send-button matching was too narrow.** It tested only `aria-label || title || data-testid` on a `<button>`, and only `/send/i`. Newer chat UIs label the control via `data-test-id`, a raw `id`, or `role="button"`, and the click target is frequently a child `<svg>`. Now walks up to `button, [role="button"]` and tests every identifying attribute plus visible text against `/send|submit/i`.
+3. **`isEditable()` rejected valid editors.** It required `contenteditable === "true"` exactly, missing `""` and `plaintext-only` (used by some frameworks), and would accept a disabled/read-only textarea. Now treats any non-`"false"` value as editable and rejects disabled inputs.
+
+**Telemetry can no longer break protection.** `bumpStats()` wraps every counter write in try/catch and no-ops if `PromptShieldStats` is absent, so a missing or broken `stats.js` degrades to "counts reset" instead of throwing inside the send handler and swallowing the prompt.
+
+**Missed sends are now visible.** `recordMiss()` counts any send gesture where no input could be resolved (`keydown:no-input`, `sendbtn:no-input`, `sendbtn:empty-input`), and the status pill turns red with an explicit "missed N sends — reload the extension" message. Previously a pass-through was completely silent. This is a diagnostic aid, not a store-facing claim; it exists because a missed send is otherwise undiagnosable without devtools.
+
+**Verification:** all five JS files pass `node --check`; manifest is valid JSON; 21/21 stats tests pass against the shipped store copy; all 11 zip entries are byte-identical to the store folder with forward-slash paths and the manifest at the root.
+
+> Note: this hardening was derived from a live-browser failure and a code audit, not from automated UI tests. The five missed-send reasons cover the observed failure, but the 15 chat sites still need manual QA on their current UIs before launch — specifically that the dialog appears and blocks on each. The `e2e/e2e_test.go` suite covers the Go proxy, not the extension's DOM interception.
+
+### Counting semantics corrected (schema v2)
+
+The first implementation counted **every prompt that passed through cleanly** as "Sent", so the dashboard reported total prompts typed rather than sensitive data caught. That buried the number a user actually cares about — a flagged prompt that was then transmitted unmodified — under routine traffic.
+
+Final rule: **a prompt is counted only when the scanner flagged it and the user chose an action.** Clean passthroughs are not counted at all.
+
+| Counter | Incremented when | Storage field |
+|---|---|---|
+| Detected | the decision dialog was raised | `detected` |
+| Blocked | Block, the `×` close button, or Escape (nothing sent) | `blocked` |
+| Masked & sent | "Mask & send" completed | `masked` |
+| Sent anyway | "Send it anyway" (raw values transmitted) | `anyway` |
+
+This yields a checkable invariant:
+
+```
+detected == blocked + masked + anyway
+```
+
+The `sent` field was **removed** from the schema rather than reused, because its old value conflated two unrelated things. `stats.js` carries a `SCHEMA = 2` marker; data written under the old schema is discarded on read instead of migrated, since the old number has no valid meaning under the new semantics. The popup's `bump()` ignores unknown field names, so a stale `sent` write is a no-op rather than a corruption.
+
+Verification: 23/23 stats tests pass, including the invariant after mixed outcomes, rejection of the removed `sent` field, legacy-schema discard, and hostile-value coercion. Both docs now state that prompts containing nothing sensitive are not counted.
+
+### Defect fixed — dead Privacy link
+
+The popup's Privacy link pointed at `https://github.com/lohith1947/promptshield/blob/main/PRIVACY.md`, which **404s for two independent reasons**:
+
+1. The repo's default branch is **`master`**, not `main` — the `blob/main` path does not exist.
+2. `PRIVACY.md` is **only committed to the `gh-pages` branch** (`git ls-tree gh-pages` → `PRIVACY.md`, `docs`, `index.md`); the repo root on `master` has no `PRIVACY.md`.
+
+Confirmed by fetching: `raw.githubusercontent.com/.../main/PRIVACY.md` → **404**, while `https://lohith1947.github.io/promptshield/PRIVACY.md` → **200**.
+
+The `chrome.tabs.create` call itself was correct and needed no permission, so this was purely a bad URL — the link rendered and was clickable, it just led to a 404. Fixed by:
+
+- Pointing both the `chrome.tabs.create` call and the anchor `href` at the published Pages URL, which is the same URL the store listing declares (§12 still needs it live at review time — it is live now).
+- Adding a `chrome.runtime.lastError` fallback to `window.open`, so the link cannot go dead if opening a tab from the popup context ever fails.
+- Giving the anchor a real `href` + `target="_blank" rel="noopener noreferrer"` instead of `href="#"`, so it still resolves if scripts fail to load.
+
+This also corrects the audit's §5 table row, which described the URL as a GitHub blob link; the destination is now the Pages URL.

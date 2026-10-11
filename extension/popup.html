@@ -89,80 +89,58 @@
   .dot.bad { background: var(--ps-primary); box-shadow: 0 0 0 3px var(--ps-primary-soft); }
 
   main { padding: 16px 16px 14px; display: grid; gap: 12px; }
-  .eyebrow { font-size: 13px; font-weight: 500; color: var(--ps-text); }
-  .eyebrow small { display: block; font-size: 12px; font-weight: 400; color: var(--ps-subtext); margin-top: 2px; }
 
-  textarea {
-    width: 100%; min-height: 88px; resize: vertical;
+  /* Stat cards */
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat {
+    position: relative; overflow: hidden;
+    padding: 14px; border-radius: 12px;
+    border: 1px solid var(--ps-border-2); background: var(--ps-surface-2);
+  }
+  .stat .n {
+    font: 400 30px/1.1 Roboto, "Segoe UI", Arial, sans-serif;
+    letter-spacing: -.5px; font-variant-numeric: tabular-nums;
+    display: flex; align-items: baseline; gap: 7px;
+  }
+  .stat .n svg { flex: none; align-self: center; }
+  .stat .k { margin-top: 4px; font-size: 12.5px; font-weight: 500; color: var(--ps-subtext); }
+  .stat .h { margin-top: 2px; font-size: 11.5px; color: var(--ps-muted); }
+  .stat.blocked { background: var(--ps-red-soft); border-color: var(--ps-red-border); }
+  .stat.blocked .n, .stat.blocked .k { color: var(--ps-red); }
+  .stat.masked { background: var(--ps-amber-soft); border-color: var(--ps-amber-border); }
+  .stat.masked .n, .stat.masked .k { color: var(--ps-amber); }
+  .stat.detected { background: var(--ps-primary-soft); border-color: transparent; }
+  .stat.detected .n, .stat.detected .k { color: var(--ps-primary); }
+  .stat.sent { background: var(--ps-green-soft); border-color: var(--ps-green-border); }
+  .stat.sent .n, .stat.sent .k { color: var(--ps-green); }
+  [data-theme="dark"] .stat.detected { border-color: var(--ps-primary-soft); }
+  .stat.zero .n { opacity: .45; }
+
+  .meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .since { font-size: 11.5px; color: var(--ps-muted); }
+  .linkbtn {
+    border: none; background: transparent; padding: 4px 6px; margin: -4px -6px;
+    color: var(--ps-primary); font: 500 12px/1 Roboto, "Segoe UI", sans-serif;
+    cursor: pointer; border-radius: 6px;
+  }
+  .linkbtn:hover { background: var(--ps-primary-soft); }
+
+  .note {
+    display: flex; gap: 9px; padding: 11px 13px; border-radius: 10px;
+    background: var(--ps-surface-2); border: 1px solid var(--ps-border-2);
+    font-size: 12px; line-height: 1.45; color: var(--ps-subtext);
+  }
+  .note svg { flex: none; margin-top: 1px; color: var(--ps-muted); }
+  .note b { color: var(--ps-text); font-weight: 500; }
+
+  .empty {
+    padding: 26px 16px; text-align: center;
+    border: 1px dashed var(--ps-border); border-radius: 12px;
     background: var(--ps-surface-2);
-    color: var(--ps-text);
-    border: 1px solid transparent; border-bottom: 2px solid var(--ps-border);
-    border-radius: 4px 4px 0 0;
-    padding: 10px 12px;
-    font: 13px/1.5 Roboto, "Segoe UI", Arial, system-ui, sans-serif;
-    outline: none;
-    transition: border-color 120ms, background 120ms;
   }
-  textarea:hover { background: var(--ps-surface-3); }
-  textarea:focus { background: var(--ps-surface-3); border-bottom-color: var(--ps-primary); }
-  textarea::placeholder { color: var(--ps-muted); }
-
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    height: 38px; padding: 0 22px; border: none;
-    border-radius: 8px;
-    background: var(--ps-primary); color: var(--ps-on-primary);
-    font: 500 14px/1 Roboto, "Segoe UI", Arial, sans-serif; letter-spacing: .1px;
-    cursor: pointer;
-    box-shadow: var(--ps-shadow-1);
-    transition: box-shadow 120ms, background 120ms;
-  }
-  .btn:hover { background: var(--ps-primary-hover); }
-  .btn:active { box-shadow: var(--ps-shadow-2); }
-  .btn:focus-visible { outline: var(--ps-ring); outline-offset: 2px; }
-  .btn.wide { width: 100%; }
-  .btn svg { flex: none; }
-
-  /* Result card */
-  #verdict { display: none; grid-template-columns: 34px 1fr; gap: 8px 10px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--ps-border-2); }
-  #verdict.show { display: grid; }
-  #verdict .vicon {
-    grid-row: 1 / 3; width: 34px; height: 34px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-  }
-  #verdict .vtitle { font-weight: 500; font-size: 13.5px; color: var(--ps-text); }
-  #verdict .vsub { font-size: 12px; color: var(--ps-subtext); }
-  #verdict .vnames { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
-  #verdict .vnames span {
-    font: 500 11px/1.3 Roboto, "Segoe UI", sans-serif;
-    padding: 3px 9px; border-radius: 999px; border: 1px solid currentColor; opacity: .9;
-  }
-  #verdict.state-pass { background: var(--ps-green-soft); border-color: var(--ps-green-border); }
-  #verdict.state-pass .vicon { background: var(--ps-green-soft); color: var(--ps-green); }
-  #verdict.state-pass .vnames span { color: var(--ps-green); }
-  #verdict.state-block { background: var(--ps-red-soft); border-color: var(--ps-red-border); }
-  #verdict.state-block .vicon { background: var(--ps-red-soft); color: var(--ps-red); }
-  #verdict.state-block .vnames span { color: var(--ps-red); }
-  #verdict.state-redact { background: var(--ps-amber-soft); border-color: var(--ps-amber-border); }
-  #verdict.state-redact .vicon { background: var(--ps-amber-soft); color: var(--ps-amber); }
-  #verdict.state-redact .vnames span { color: var(--ps-amber); }
-  #verdict.state-log { background: var(--ps-surface-2); border-color: var(--ps-border-2); }
-  #verdict.state-log .vicon { background: var(--ps-surface-3); color: var(--ps-subtext); }
-  #verdict.state-log .vnames span { color: var(--ps-subtext); }
-
-  /* Masked card */
-  #masked { display: none; gap: 6px; flex-direction: column; }
-  #masked.show { display: flex; }
-  #masked .mrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  #masked .mrow span { color: var(--ps-subtext); font-size: 12px; font-weight: 500; }
-  #masked textarea { min-height: 64px; }
-  #copyMasked {
-    height: 30px; padding: 0 14px; border-radius: 6px;
-    border: 1px solid var(--ps-border);
-    background: var(--ps-bg); color: var(--ps-primary);
-    font: 500 12.5px/1 Roboto, "Segoe UI", sans-serif; cursor: pointer;
-  }
-  #copyMasked:hover { background: var(--ps-surface-2); }
+  .empty svg { color: var(--ps-muted); }
+  .empty .t { margin-top: 10px; font-weight: 500; font-size: 13.5px; }
+  .empty .s { margin-top: 3px; font-size: 12px; color: var(--ps-subtext); }
 
   footer {
     display: flex; align-items: center; justify-content: space-between;
@@ -190,20 +168,7 @@
 </style>
 </head>
 <body>
-<script>
-  // Apply theme ASAP to avoid a flash (system default; override from this
-  // page's own localStorage — no special permission needed).
-  (function () {
-    var t = 'auto';
-    try {
-      var saved = localStorage.getItem('ps-theme');
-      if (saved === 'light' || saved === 'dark') t = saved;
-    } catch (_e) {}
-    var resolved = t;
-    if (t === 'auto') resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', resolved);
-  })();
-</script>
+<script src="theme.js"></script>
 <header>
   <div class="brand">
     <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
@@ -219,19 +184,40 @@
   <div class="dotstatus"><span class="dot" id="dot"></span><span id="statusText">Checking…</span></div>
 </header>
 <main>
-  <div class="eyebrow">Test a prompt <small>Paste something and scan it. Only works locally — nothing leaves your machine.</small></div>
-  <textarea id="text" placeholder='e.g. My API key is sk-… or "password is Hunter2Secure99"'></textarea>
-  <button class="btn wide" id="scan">
-    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/>
-      <path d="M20 20l-3.2-3.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <div class="stat-grid" id="statGrid">
+    <div class="stat detected zero" id="cDetected">
+      <div class="n"><span id="nDetected">0</span></div>
+      <div class="k">Detected</div>
+      <div class="h">prompts flagged as sensitive</div>
+    </div>
+    <div class="stat blocked zero" id="cBlocked">
+      <div class="n"><span id="nBlocked">0</span></div>
+      <div class="k">Blocked</div>
+      <div class="h">never left your machine</div>
+    </div>
+    <div class="stat masked zero" id="cMasked">
+      <div class="n"><span id="nMasked">0</span></div>
+      <div class="k">Masked &amp; sent</div>
+      <div class="h">values replaced</div>
+    </div>
+    <div class="stat sent zero" id="cSent">
+      <div class="n"><span id="nSent">0</span></div>
+      <div class="k">Sent anyway</div>
+      <div class="h" id="hSent">flagged prompts sent as-is</div>
+    </div>
+  </div>
+
+  <div class="meta">
+    <span class="since" id="since">Loading…</span>
+    <button class="linkbtn" id="reset" title="Set all counters back to zero">Reset</button>
+  </div>
+
+  <div class="note">
+    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2l8 3.2V11c0 4.7-3.3 8.3-8 11-4.7-2.7-8-6.3-8-11V5.2L12 2z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+      <path d="M12 8.4v4.4M12 15.6v.2" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round"/>
     </svg>
-    Scan prompt
-  </button>
-  <div id="verdict"></div>
-  <div id="masked">
-    <div class="mrow"><span>Masked version — safe to send</span><button id="copyMasked">Copy</button></div>
-    <textarea id="maskedText" readonly></textarea>
+    <div id="noteText">Only these counts are stored on this device. Your prompt text and the sensitive values themselves are never saved.</div>
   </div>
 </main>
 <footer>
@@ -242,10 +228,10 @@
       <button id="themeAuto" title="Follow system"><svg width="13" height="13" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
       <button id="themeDark" title="Dark"><svg width="13" height="13" viewBox="0 0 24 24"><path d="M20 14.2A8.5 8.5 0 0 1 9.8 4 8.2 8.2 0 1 0 20 14.2z" fill="currentColor"/></svg></button>
     </div>
-    <a href="#" id="privacyLink">Privacy</a>
+    <a href="https://lohith1947.github.io/promptshield/PRIVACY.md" id="privacyLink" target="_blank" rel="noopener noreferrer">Privacy</a>
   </div>
 </footer>
-<script src="scanner.js"></script>
+<script src="stats.js"></script>
 <script src="popup.js"></script>
 </body>
 </html>
